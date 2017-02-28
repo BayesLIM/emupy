@@ -406,17 +406,20 @@ class Emu(object):
         else:
             if (vectorize == True and pool is not None) or vectorize == False:
                 output = M(lambda x: self.predict(x, output=True, **predict_kwargs), grid_cv)
+                recon,recon_err,recon_err_cov,weights,weights_err = [],[],[],[],[]
+                for i in range(len(output)):
+                    recon.append(output[i][0][0])
+                    recon_err.append(output[i][1][0])
+                    recon_err_cov.append(output[i][2][0])
+                    weights.append(output[i][3][0])
+                    weights_err.append(output[i][4][0])
+                recon,recon_err,recon_err_cov = np.array(recon), np.array(recon_err), np.array(recon_err_cov)
+                weights, weights_err = np.array(weights), np.array(weights_err)
+
             elif vectorize == True:
-                output = self.predict(grid_cv,output=True,**predict_kwargs)
-            recon,recon_err,recon_err_cov,weights,weights_err = [],[],[],[],[]
-            for i in range(len(output)):
-                recon.append(output[i][0][0])
-                recon_err.append(output[i][1][0])
-                recon_err_cov.append(output[i][2][0])
-                weights.append(output[i][3][0])
-                weights_err.append(output[i][4][0])
-            recon,recon_err,recon_err_cov = np.array(recon), np.array(recon_err), np.array(recon_err_cov)
-            weights, weights_err = np.array(weights), np.array(weights_err)
+                output = self.predict(grid_cv, output=True, **predict_kwargs)
+                recon, recon_err, recon_err_cov, weights, weights_err = output
+
             self.recon_cv = recon
             self.recon_err_cv = recon_err
             self.recon_err_cov_cv = recon_err_cov
