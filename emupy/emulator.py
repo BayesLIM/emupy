@@ -371,7 +371,8 @@ class Emu(object):
 
         return recon_cv, recon_err_cv, recon_grid, recon_data, rando
 
-    def cross_validate(self,grid_cv,data_cv,use_pca=True,predict_kwargs={},output=False,LAYG=False,use_tree=False,pool=None,reject_self=True):
+    def cross_validate(self,grid_cv,data_cv,use_pca=True,predict_kwargs={},output=False,LAYG=False,use_tree=False,
+                    vectorize=True,pool=None,reject_self=True):
 
         # Solve for eigenmode weight constants
         if use_pca == True:
@@ -386,7 +387,7 @@ class Emu(object):
                 M = pool.map
             if grid_cv.ndim == 1: grid_cv = grid_cv[np.newaxis,:]
             recon,recon_err,recon_err_cov,weights,weights_err = [],[],[],[],[]
-            output = map(lambda x: self.predict(x, output=True, use_tree=use_tree, reject_self=reject_self, **predict_kwargs), grid_cv)
+            output = M(lambda x: self.predict(x, output=True, use_tree=use_tree, reject_self=reject_self, **predict_kwargs), grid_cv)
             for i in range(len(output)):
                 recon.append(output[i][0][0])
                 recon_err.append(output[i][1][0])
@@ -401,12 +402,24 @@ class Emu(object):
             self.weights_cv = weights
             self.weights_err_cv = weights_err
         else:
-            self.predict(grid_cv,output=False,**predict_kwargs)
-            self.recon_cv = self.recon
-            self.recon_err_cv = self.recon_err
-            self.recon_err_cov_cv = self.recon_err_cov
-            self.weights_cv = self.weights
-            self.weights_err_cv = self.weights_err
+            if (vectorize == True and pool is not None) or vectorize == False:
+                output = M(lambda x: self.predict(x, output=True, **predict_kwargs), grid_cv)
+            elif vectorize == True:
+                output = self.predict(grid_cv,output=True,**predict_kwargs)
+            recon,recon_err,recon_err_cov,weights,weights_err = [],[],[],[],[]
+            for i in range(len(output)):
+                recon.append(output[i][0][0])
+                recon_err.append(output[i][1][0])
+                recon_err_cov.append(output[i][2][0])
+                weights.append(output[i][3][0])
+                weights_err.append(output[i][4][0])
+            recon,recon_err,recon_err_cov = np.array(recon), np.array(recon_err), np.array(recon_err_cov)
+            weights, weights_err = np.array(weights), np.array(weights_err)
+            self.recon_cv = recon
+            self.recon_err_cv = recon_err
+            self.recon_err_cov_cv = recon_err_cov
+            self.weights_cv = weights
+            self.weights_err_cv = weights_err
 
         if output == True:
             return self.recon_cv, self.recon_err_cv, self.recon_err_cov, self.weights_cv, self.weights_err_cv
