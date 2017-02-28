@@ -379,12 +379,14 @@ class Emu(object):
             self.klt_project(data_cv)
             self.weights_true_cv = self.w_tr * self.w_norm
 
+        # Set-up iterator
+        if pool is None:
+            M = map
+        else:
+            M = pool.map
+
         # Predict
         if LAYG == True:
-            if pool is None:
-                M = map
-            else:
-                M = pool.map
             if grid_cv.ndim == 1: grid_cv = grid_cv[np.newaxis,:]
             recon,recon_err,recon_err_cov,weights,weights_err = [],[],[],[],[]
             output = M(lambda x: self.predict(x, output=True, use_tree=use_tree, reject_self=reject_self, **predict_kwargs), grid_cv)
