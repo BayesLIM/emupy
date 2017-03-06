@@ -251,10 +251,7 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_obs_errs == True:
-            if self.lognorm == True:
-                D /= np.log(self.yerrs/self.fid_data)
-            else:
-                D /= self.yerrs
+            D *= (1/self.yerrs)/(1/self.yerrs).max() * 2
 
         # Find Covariance
         Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
