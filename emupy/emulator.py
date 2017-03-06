@@ -232,13 +232,17 @@ class Emu(object):
         
         # Compute fiducial data set
         if fid_data is None:
-            fid_data = np.array(map(np.median,data_tr.T))
+            if self.lognorm == True:
+                fid_data = np.array(map(astats.biweight_location, np.log(data_tr)))
+            else:
+                fid_data = np.array(map(astats.biweight_location, data_tr.T))
 
         # Find self-variance of mean-subtracted data
         if self.lognorm == True:
             D = np.log(data_tr / fid_data)
         else:
             D = (data_tr - fid_data)
+
         Dstd = np.array(map(astats.biweight_midvariance,D.T))
 
         if self.scale_by_std == True:
@@ -247,7 +251,10 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_obs_errs == True:
-            D /= self.yerrs
+            if self.lognorm == True:
+                D /= np.log(self.yerrs/self.fid_data)
+            else:
+                D /= self.yerrs
 
         # Find Covariance
         Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
