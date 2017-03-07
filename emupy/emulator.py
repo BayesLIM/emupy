@@ -258,7 +258,7 @@ class Emu(object):
             Davg_ov_yerr = np.array(map(astats.biweight_location, (data_tr/self.yerrs).T ))
             Davg_ov_yerr -= np.abs(Davg_ov_yerr.min())
             Davg_ov_yerr /= Davg_ov_yerr.max()
-            Davg_ov_yerr *= 4.0
+            Davg_ov_yerr *= 9.0
             Davg_ov_yerr += 1.0
             self.Davg_ov_yerr = Davg_ov_yerr
             D *= self.Davg_ov_yerr
