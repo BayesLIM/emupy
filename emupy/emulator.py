@@ -233,7 +233,7 @@ class Emu(object):
         # Compute fiducial data set
         if fid_data is None:
             if self.lognorm == True:
-                fid_data = np.array(map(astats.biweight_location, np.log(data_tr)))
+                fid_data = np.exp(np.array(map(astats.biweight_location, np.log(data_tr.T))))
             else:
                 fid_data = np.array(map(astats.biweight_location, data_tr.T))
 
@@ -253,6 +253,15 @@ class Emu(object):
         if self.scale_by_obs_errs == True:
             self.obs_err_mult = (((1/self.yerrs)/(1/self.yerrs).max())+1)
             D *= self.obs_err_mult
+
+        if self.scale_by_davg_ov_yerr == True:
+            Davg_ov_yerr = np.array(map(astats.biweight_location, (data_tr/self.yerrs).T ))
+            Davg_ov_yerr -= np.abs(Davg.min())
+            Davg_ov_yerr /= Davg.max()
+            Davg_ov_yerr *= 4.0
+            Davg_ov_yerr += 1.0
+            self.Davg_ov_yerr = Davg_ov_yerr
+            D *= self.Davg_ov_yerr
 
         # Find Covariance
         Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
@@ -305,6 +314,9 @@ class Emu(object):
 
         if self.scale_by_obs_errs == True:
             D *= self.obs_err_mult
+
+        if self.scale_by_davg_ov_yerr == True:
+            D *= self.Davg_ov_yerr
 
         # Project onto eigenvectors
         self.w_tr = np.dot(D,self.eig_vecs.T)
@@ -657,6 +669,9 @@ class Emu(object):
             if self.scale_by_obs_errs == True:
                 recon /= self.obs_err_mult
 
+            if self.scale_by_davg_ov_yerr == True:
+                recon /= self.Davg_ov_yerr
+
             recon += self.fid_data
 
             weights_err = self.stand_err.reshape(weights.shape) * self.w_norm
@@ -707,7 +722,10 @@ class Emu(object):
                 recon *= self.Dstd
 
             if self.scale_by_obs_errs == True:
-                recon  /= self.obs_err_mult
+                recon /= self.obs_err_mult
+
+            if self.scale_by_davg_ov_yerr == True:
+                recon /= self.Davg_ov_yerr
 
             if self.lognorm == True:
                 recon = np.exp(recon)
