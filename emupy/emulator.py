@@ -251,7 +251,8 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_obs_errs == True:
-            D *= (((1/self.yerrs)/(1/self.yerrs).max())+1)
+            self.obs_err_mult = (((1/self.yerrs)/(1/self.yerrs).max())+1)
+            D *= self.obs_err_mult
 
         # Find Covariance
         Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
@@ -303,7 +304,7 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_obs_errs == True:
-            D /= self.yerrs
+            D *= self.obs_err_mult
 
         # Project onto eigenvectors
         self.w_tr = np.dot(D,self.eig_vecs.T)
@@ -654,7 +655,7 @@ class Emu(object):
                 recon *= self.Dstd
 
             if self.scale_by_obs_errs == True:
-                recon *= self.yerrs
+                recon /= self.obs_err_mult
 
             recon += self.fid_data
 
@@ -706,7 +707,7 @@ class Emu(object):
                 recon *= self.Dstd
 
             if self.scale_by_obs_errs == True:
-                recon  *= self.yerrs
+                recon  /= self.obs_err_mult
 
             if self.lognorm == True:
                 recon = np.exp(recon)
