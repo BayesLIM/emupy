@@ -251,7 +251,7 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_obs_errs == True:
-            D *= (1/self.yerrs)/(1/self.yerrs).max() * 2
+            D *= (((1/self.yerrs)/(1/self.yerrs).max())+1)
 
         # Find Covariance
         Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
