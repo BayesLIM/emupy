@@ -627,7 +627,7 @@ class Emu(object):
         '''
         # Ensure Xpred isn't a row vector
         if Xpred.ndim == 1:
-            Xpred = Xpred.reshape(-1,1)
+            Xpred = Xpred.reshape(1,-1)
 
         # Chi Square Multiplier, 95% prob
         self.csm = np.sqrt([3.841,5.991,7.815,9.488,11.070,12.592,14.067,15.507,16.919])
