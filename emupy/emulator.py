@@ -246,9 +246,7 @@ class Emu(object):
         Dstd = np.array(map(astats.biweight_midvariance,D.T))
 
         if self.scale_by_std == True:
-            if 'Dstd' not in self.__dict__.keys():
-                self.Dstd = np.array(map(astats.biweight_midvariance,D.T))
-            D /= self.Dstd
+            D /= Dstd
 
         if self.scale_by_obs_errs == True:
             self.obs_err_mult = (((1/self.yerrs)/(1/self.yerrs).max())+1)
@@ -258,7 +256,7 @@ class Emu(object):
             Davg_ov_yerr = np.array(map(astats.biweight_location, (data_tr/self.yerrs).T ))
             Davg_ov_yerr -= np.abs(Davg_ov_yerr.min())
             Davg_ov_yerr /= Davg_ov_yerr.max()
-            Davg_ov_yerr *= 9.0
+            Davg_ov_yerr *= (self.davg_maxscale - 1)
             Davg_ov_yerr += 1.0
             self.Davg_ov_yerr = Davg_ov_yerr
             D *= self.Davg_ov_yerr
