@@ -684,8 +684,6 @@ class Emu(object):
             iterate = self.N_modegroups
             # Iterate over GPs
             for j in range(iterate):
-                print "Xpred_sph.shape = ",Xpred_sph.shape
-                print "Xpred_sph.ndim = ",Xpred_sph.ndim
                 if GPs != None:
                     if fast == True:
                         w = GPs[j].predict(Xpred_sph,return_cov=False)
