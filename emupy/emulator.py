@@ -679,6 +679,7 @@ class Emu(object):
             weights_err = self.stand_err.reshape(weights.shape) * self.w_norm
  
         # Gaussian Process Interpolation
+        print 'Xpred_sph.shape = ',Xpred_sph.shape
         if self.reg_meth == 'gaussian':
             weights,MSE = [],[]
             iterate = self.N_modegroups
