@@ -556,7 +556,6 @@ class Emu(object):
         names = ['xhat','stand_err','GP']
         self.update(ezcreate(names,locals()))
 
-
     def hypersolve_1D(self, grid_od, data_od, kernel=None, n_restarts=4, alpha=1e-3):
         """
         Solve for hyperparameters across each dimension individually
@@ -645,7 +644,7 @@ class Emu(object):
         # Check for LAYG
         if LAYG == True:
             self.sphere(self.grid_tr, fid_params=self.fid_params, invL=self.invL)
-            grid_NN = self.nearest(Xpred_sph, k=k, use_tree=use_tree, reject_self=reject_self)[1]
+            grid_NN = self.nearest(Xpred_sph.ravel(), k=k, use_tree=use_tree, reject_self=reject_self)[1]
             self.train(self.data_tr[grid_NN],self.grid_tr[grid_NN],fid_data=self.fid_data,
                             fid_params=self.fid_params,**kwargs_tr)
 
