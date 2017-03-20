@@ -253,8 +253,8 @@ class Emu(object):
             D *= self.obs_err_mult
 
         if self.scale_by_davg_ov_yerr == True:
-            Davg_ov_yerr = np.array(map(astats.biweight_location, np.log(data_tr/self.yerrs**2).T ))
-            Davg_ov_yerr -= np.abs(Davg_ov_yerr.min())
+            Davg_ov_yerr = np.array(map(astats.biweight_location, np.log((data_tr/self.yerrs)**2).T ))
+            Davg_ov_yerr -= Davg_ov_yerr.min()
             Davg_ov_yerr /= Davg_ov_yerr.max()
             Davg_ov_yerr *= (self.davg_maxscale - 1)
             Davg_ov_yerr += 1.0
