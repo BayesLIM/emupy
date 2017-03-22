@@ -612,7 +612,7 @@ class Emu(object):
             self.N_modegroups = N_modegroups
             self.modegroups = modegroups
 
-    def predict(self,Xpred,use_Nmodes=None,GPs=None,fast=False,\
+    def predict(self,Xpred,use_Nmodes=None,fast=False,pool=None,\
         use_pca=True,sphere=True,output=False,kwargs_tr={},LAYG=False,k=50,use_tree=True,reject_self=False):
         '''
         - param_vals is ndarray with shape [N_params,N_samples]
@@ -679,32 +679,15 @@ class Emu(object):
  
         # Gaussian Process Interpolation
         if self.reg_meth == 'gaussian':
-            weights,MSE = [],[]
-            iterate = self.N_modegroups
             # Iterate over GPs
-            for j in range(iterate):
-                if GPs != None:
-                    if fast == True:
-                        w = GPs[j].predict(Xpred_sph,return_cov=False)
-                        weights.extend(w.T)
-                        MSE.extend(np.zeros(w.shape).T)
-                    else:
-                        w,mse = GPs[j].predict(Xpred_sph,return_cov=True)
-                        mse = np.sqrt(mse.diagonal())
-                        weights.extend(w.T)
-                        MSE.extend(np.ones(w.shape).T*mse)
-                else:
-                    if fast == True:
-                        w = self.GP[j].predict(Xpred_sph,return_cov=False)
-                        weights.extend(w.T)
-                        MSE.extend(np.zeros(w.shape).T)
-                    else:
-                        w,mse = self.GP[j].predict(Xpred_sph,return_cov=True)
-                        mse = np.sqrt(mse.diagonal())
-                        weights.extend(w.T)
-                        MSE.extend(np.ones(w.shape).T*mse)
+            if pool is None:
+                M = map
+            else:
+                M = pool.map
+            output = M(lambda x: x.predict(Xpred_sph, return_cov=(fast==False)), self.GP[:self.N_modegroups])
+            w = np.array(map(lambda x: x[0].ravel(), output))
+            mse = np.array(map(lambda x: x[1].diagonal(), output))
 
-            weights,MSE = np.array(weights).T,np.array(MSE).T
             if weights.ndim == 1:
                 weights = weights.reshape(Xpred_shape[1],len(weights))
                 MSE = MSE.reshape(Xpred_shape[1],len(weights))
