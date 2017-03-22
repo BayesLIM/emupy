@@ -735,20 +735,25 @@ class Emu(object):
                 recon += self.fid_data
 
         # Calculate Error
-        if use_pca == True:
-            emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
-            recon_err = np.sqrt( np.array(map(lambda x: np.sum(x,axis=0),emode_err**2)) )
-            recon_err_cov = np.array([[np.outer(self.eig_vecs[j],self.eig_vecs[j])*weights_err[i][j]**2 for j in range(self.N_modes)] for i in range(len(recon))])
-            recon_err_cov = np.sum(recon_err_cov, axis=1)
+        if fast == True:
+            recon_err = np.zeros((len(Xpred_sph), self.eig_vecs.shape[1]))
+            recon_err = np.zeros((len(Xpred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
 
         else:
-            recon_err = weights_err
-            recon_err_cov = np.array([np.eye(len(recon.T[i]),len(recon.T[i])) * recon_err.T[i] for i in range(len(recon.T))]).T
+            if use_pca == True:
+                emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
+                recon_err = np.sqrt( np.array(map(lambda x: np.sum(x,axis=0),emode_err**2)) )
+                recon_err_cov = np.array([[np.outer(self.eig_vecs[j],self.eig_vecs[j])*weights_err[i][j]**2 for j in range(self.N_modes)] for i in range(len(recon))])
+                recon_err_cov = np.sum(recon_err_cov, axis=1)
 
-        # ReNormalize Error
-        if self.lognorm == True:
-            recon_err = np.array([recon_err[i]*recon[i] for i in range(len(recon))])
-            recon_err_cov = np.array([recon_err_cov[i]*np.outer(recon_err[i],recon_err[i]) for i in range(len(recon))])
+            else:
+                recon_err = weights_err
+                recon_err_cov = np.array([np.eye(len(recon.T[i]),len(recon.T[i])) * recon_err.T[i] for i in range(len(recon.T))]).T
+
+            # ReNormalize Error
+            if self.lognorm == True:
+                recon_err = np.array([recon_err[i]*recon[i] for i in range(len(recon))])
+                recon_err_cov = np.array([recon_err_cov[i]*np.outer(recon_err[i],recon_err[i]) for i in range(len(recon))])
 
         # Calibrate recon
         recon *= self.recon_calib
