@@ -696,7 +696,7 @@ class Emu(object):
                 return w, mse
 
             output = np.array(M(lambda x: fun(Xpred_sph, x, return_cov=(fast==False)), self.GP[:self.N_modegroups]))
-            weights, MSE = output[:,0,:], output[:,1,:]
+            weights, MSE = output[:,0,:].T, output[:,1,:].T
 
             if weights.ndim == 1:
                 weights = weights.reshape(Xpred_shape[1],len(weights))
