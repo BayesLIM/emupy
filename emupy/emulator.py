@@ -684,9 +684,19 @@ class Emu(object):
                 M = map
             else:
                 M = pool.map
-            output = M(lambda x: x.predict(Xpred_sph, return_cov=(fast==False)), self.GP[:self.N_modegroups])
-            w = np.array(map(lambda x: x[0].ravel(), output))
-            mse = np.array(map(lambda x: x[1].diagonal(), output))
+
+            def fun(theta, GP, return_cov=True):
+                output = GP.predict(theta, return_cov=return_cov)
+                if return_cov == True:
+                    w = np.array(output[0]).ravel()
+                    mse = np.sqrt(np.array(output[1]).diagonal()).ravel()
+                else:
+                    w = np.array(output).ravel()
+                    mse = np.zeros(w.shape).ravel()
+                return w, mse
+
+            output = np.array(M(lambda x: fun(Xpred_sph, x, return_cov=(fast==False)), self.GP[:self.N_modegroups]))
+            weights, MSE = output[:,0,:], output[:,1,:]
 
             if weights.ndim == 1:
                 weights = weights.reshape(Xpred_shape[1],len(weights))
