@@ -737,7 +737,7 @@ class Emu(object):
         # Calculate Error
         if fast == True:
             recon_err = np.zeros((len(Xpred_sph), self.eig_vecs.shape[1]))
-            recon_err = np.zeros((len(Xpred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
+            recon_err_cov = np.zeros((len(Xpred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
 
         else:
             if use_pca == True:
