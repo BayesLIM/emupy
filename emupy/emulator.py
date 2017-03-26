@@ -684,12 +684,23 @@ class Emu(object):
                     mse = np.zeros(w.shape).ravel()
                 return w, mse
 
-            result = np.array(M(lambda x: fun(Xpred_sph, x, return_cov=(fast==False)), self.GP[:self.N_modegroups]))
-            weights, MSE = result[:,0,:].T, result[:,1,:].T
+            weights, MSE = [], []
+            for i in range(self.N_modegroups):
+                result = self.GP[i].predict(Xpred_sph, return_cov=(fast==False))
+                if fast == True:
+                    w = np.array(result).ravel()
+                    mse = np.zeros(w.shape).ravel()
+                else:
+                    w = np.array(result[0]).ravel()
+                    mse = np.sqrt(np.array(result[1]).diagonal()).ravel()
+                weights.extend(w)
+                MSE.extend(mse)
+            weights = np.array(weights)
+            MSE = np.array(MSE)
 
             if weights.ndim == 1:
-                weights = weights.reshape(Xpred_shape[1],len(weights))
-                MSE = MSE.reshape(Xpred_shape[1],len(weights))
+                weights = weights.reshape(1,-1)
+                MSE = MSE.reshape(1,-1)
 
             # Renormalize weights
             weights *= self.w_norm
