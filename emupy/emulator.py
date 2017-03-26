@@ -664,17 +664,6 @@ class Emu(object):
             else:
                 recon = weights.T[0]
 
-            if self.scale_by_std == True:
-                recon *= self.Dstd
-
-            if self.scale_by_obs_errs == True:
-                recon /= self.obs_err_mult
-
-            if self.scale_by_davg_ov_yerr == True:
-                recon /= self.Davg_ov_yerr
-
-            recon += self.fid_data
-
             weights_err = self.stand_err.reshape(weights.shape) * self.w_norm
  
         # Gaussian Process Interpolation
@@ -712,20 +701,20 @@ class Emu(object):
             else:
                 recon = weights
 
-            if self.scale_by_std == True:
-                recon *= self.Dstd
+        if self.scale_by_std == True:
+            recon *= self.Dstd
 
-            if self.scale_by_obs_errs == True:
-                recon /= self.obs_err_mult
+        if self.scale_by_obs_errs == True:
+            recon /= self.obs_err_mult
 
-            if self.scale_by_davg_ov_yerr == True:
-                recon /= self.Davg_ov_yerr
+        if self.scale_by_davg_ov_yerr == True:
+            recon /= self.Davg_ov_yerr
 
-            if self.lognorm == True:
-                recon = np.exp(recon)
-                recon *= self.fid_data
-            else:
-                recon += self.fid_data
+        if self.lognorm == True:
+            recon = np.exp(recon)
+            recon *= self.fid_data
+        else:
+            recon += self.fid_data
 
         # Calculate Error
         if fast == True:
@@ -735,9 +724,12 @@ class Emu(object):
         else:
             if use_pca == True:
                 emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
+                if self.scale_by_davg_ov_yerr == True:
+                    emode_err /= self.Davg_ov_yerr
+                if self.scale_by_std == True:
+                    emode_err *= self.Dstd
                 recon_err = np.sqrt( np.array(map(lambda x: np.sum(x,axis=0),emode_err**2)) )
-                recon_err_cov = np.array([[np.outer(self.eig_vecs[j],self.eig_vecs[j])*weights_err[i][j]**2 for j in range(self.N_modes)] for i in range(len(recon))])
-                recon_err_cov = np.sum(recon_err_cov, axis=1)
+                recon_err_cov = np.sum([[np.outer(emode_err[i,j], emode_err[i,j]) for j in range(self.N_modes)] for i in range(len(recon))], axis=1)
 
             else:
                 recon_err = weights_err
@@ -746,7 +738,7 @@ class Emu(object):
             # ReNormalize Error
             if self.lognorm == True:
                 recon_err = np.array([recon_err[i]*recon[i] for i in range(len(recon))])
-                recon_err_cov = np.array([recon_err_cov[i]*np.outer(recon_err[i],recon_err[i]) for i in range(len(recon))])
+                recon_err_cov = np.array([recon_err_cov[i]*np.outer(recon[i],recon[i]) for i in range(len(recon))])
 
         # Calibrate recon
         recon *= self.recon_calib
