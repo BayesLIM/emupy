@@ -441,8 +441,8 @@ class Emu(object):
             self.weights_cv = weights
             self.weights_err_cv = weights_err
 
-        self.weights_cv *= self.w_norm
-        self.weights_err_cv *= self.w_norm
+        self.weights_cv /= self.w_norm
+        self.weights_err_cv /= self.w_norm
 
         if output == True:
             return self.recon_cv, self.recon_err_cv, self.recon_err_cov, self.weights_cv, self.weights_err_cv
