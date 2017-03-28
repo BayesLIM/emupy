@@ -669,19 +669,17 @@ class Emu(object):
         # Gaussian Process Interpolation
         if self.reg_meth == 'gaussian':
             # Iterate over GPs
-            weights, MSE = [], []
-            for i in range(self.N_modegroups):
+            weights, MSE = np.zeros((len(Xpred_sph), self.N_modes)), np.zeros((len(Xpred_sph), self.N_modes))
+            for i,j in enumerate(self.modegroups):
                 result = self.GP[i].predict(Xpred_sph, return_cov=(fast==False))
                 if fast == True:
-                    w = np.array(result).ravel()
-                    mse = np.zeros(w.shape).ravel()
+                    w = np.array(result)
+                    mse = np.zeros(w.shape)
                 else:
-                    w = np.array(result[0]).ravel()
-                    mse = np.sqrt(np.array(result[1]).diagonal()).ravel()
-                weights.append(w)
-                MSE.append(mse)
-            weights = np.array(weights).T
-            MSE = np.array(MSE).T
+                    w = np.array(result[0])
+                    mse = np.array([np.sqrt(np.array(result[1]).diagonal()) for i in range(len(j))]).T
+                weights[:,j] = w
+                MSE[:,j] = mse
 
             if weights.ndim == 1:
                 weights = weights.reshape(1,-1)
