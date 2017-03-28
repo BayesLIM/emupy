@@ -669,21 +669,6 @@ class Emu(object):
         # Gaussian Process Interpolation
         if self.reg_meth == 'gaussian':
             # Iterate over GPs
-            if pool is None:
-                M = map
-            else:
-                M = pool.map
-
-            def fun(theta, GP, return_cov=True):
-                result = GP.predict(theta, return_cov=return_cov)
-                if return_cov == True:
-                    w = np.array(result[0]).ravel()
-                    mse = np.sqrt(np.array(result[1]).diagonal()).ravel()
-                else:
-                    w = np.array(result).ravel()
-                    mse = np.zeros(w.shape).ravel()
-                return w, mse
-
             weights, MSE = [], []
             for i in range(self.N_modegroups):
                 result = self.GP[i].predict(Xpred_sph, return_cov=(fast==False))
@@ -693,10 +678,10 @@ class Emu(object):
                 else:
                     w = np.array(result[0]).ravel()
                     mse = np.sqrt(np.array(result[1]).diagonal()).ravel()
-                weights.extend(w)
-                MSE.extend(mse)
-            weights = np.array(weights)
-            MSE = np.array(MSE)
+                weights.append(w)
+                MSE.append(mse)
+            weights = np.array(weights).T
+            MSE = np.array(MSE).T
 
             if weights.ndim == 1:
                 weights = weights.reshape(1,-1)
