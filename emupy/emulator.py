@@ -670,7 +670,7 @@ class Emu(object):
         if self.reg_meth == 'gaussian':
             # Iterate over GPs
             weights, MSE = np.zeros((len(Xpred_sph), self.N_modes)), np.zeros((len(Xpred_sph), self.N_modes))
-            for i in range(len(self.GP))
+            for i in range(len(self.GP)):
                 result = self.GP[i].predict(Xpred_sph, return_cov=(fast==False))
                 if fast == True:
                     w = np.array(result)
