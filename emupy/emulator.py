@@ -322,7 +322,7 @@ class Emu(object):
 
     def kfold_cv(self,grid_tr,data_tr,use_pca=True,predict_kwargs={},
                    rando=None, kfold_Nclus=None, kfold_Nsamp=None, kwargs_tr={},
-                   RandomState=1, pool=None):
+                   RandomState=1, pool=None, vectorize=True):
         """
         Cross validate emulator
 
@@ -373,7 +373,7 @@ class Emu(object):
             # Train     
             self.train(data_tr_temp,grid_tr_temp,fid_data=self.fid_data,fid_params=self.fid_params,**kwargs_tr)
             # Cross Valid
-            self.cross_validate(grid_tr[rando[i]], data_tr[rando[i]], use_pca=use_pca, predict_kwargs=predict_kwargs)
+            self.cross_validate(grid_tr[rando[i]], data_tr[rando[i]], use_pca=use_pca, predict_kwargs=predict_kwargs, vectorize=vectorize)
             recon_cv.extend(self.recon_cv)
             recon_err_cv.extend(self.recon_err_cv)
             recon_grid.extend(np.copy(grid_tr[rando[i]]))
