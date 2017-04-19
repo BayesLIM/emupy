@@ -243,23 +243,16 @@ class Emu(object):
         else:
             D = (data_tr - fid_data)
 
-        Dstd = np.array(map(astats.biweight_midvariance,D.T))
-
         if self.scale_by_std == True:
-            D /= Dstd
+            self.Dstd = np.array(map(astats.biweight_midvariance,D.T))
+            D /= self.Dstd
 
-        if self.scale_by_obs_errs == True:
-            self.obs_err_mult = (((1/self.yerrs)/(1/self.yerrs).max())+1)
-            D *= self.obs_err_mult
-
-        if self.scale_by_davg_ov_yerr == True:
-            Davg_ov_yerr = np.array(map(astats.biweight_location, ((data_tr/self.yerrs)**(1.0)).T ))
-            Davg_ov_yerr -= Davg_ov_yerr.min()
-            Davg_ov_yerr /= Davg_ov_yerr.max()
-            Davg_ov_yerr *= (self.davg_maxscale - 1)
-            Davg_ov_yerr += 1.0
-            self.Davg_ov_yerr = Davg_ov_yerr
-            D *= self.Davg_ov_yerr
+        if self.scale_by_yerrs = True:
+            if self.lognorm == True:
+                self.Dnoise = O.yerrs/O.ydata
+            else:
+                self.Dnoise = O.yerrs
+            D /= self.Dnoise
 
         # Find Covariance
         Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
@@ -295,7 +288,7 @@ class Emu(object):
         w_tr /= w_norm
 
         # Update to Namespace
-        names = ['D','Dstd','data_tr','Dcov','eig_vals','eig_vecs','w_tr','tot_var','rec_var','frac_var','fid_data','w_norm']
+        names = ['D','data_tr','Dcov','eig_vals','eig_vecs','w_tr','tot_var','rec_var','frac_var','fid_data','w_norm']
         self.update(ezcreate(names,locals()))
 
     def klt_project(self,data):
@@ -307,14 +300,12 @@ class Emu(object):
             D = np.log(data / self.fid_data)
         else:
             D = data - self.fid_data
+
         if self.scale_by_std == True:
             D /= self.Dstd
 
-        if self.scale_by_obs_errs == True:
-            D *= self.obs_err_mult
-
-        if self.scale_by_davg_ov_yerr == True:
-            D *= self.Davg_ov_yerr
+        if self.scale_by_yerrs == True:
+            D /= self.Dnoise
 
         # Project onto eigenvectors
         self.w_tr = np.dot(D,self.eig_vecs.T)
@@ -698,11 +689,8 @@ class Emu(object):
         if self.scale_by_std == True:
             recon *= self.Dstd
 
-        if self.scale_by_obs_errs == True:
-            recon /= self.obs_err_mult
-
-        if self.scale_by_davg_ov_yerr == True:
-            recon /= self.Davg_ov_yerr
+        if self.scale_by_yerrs == True:
+            recon *= self.Dnoise
 
         if self.lognorm == True:
             recon = np.exp(recon)
@@ -718,8 +706,8 @@ class Emu(object):
         else:
             if use_pca == True:
                 emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
-                if self.scale_by_davg_ov_yerr == True:
-                    emode_err /= self.Davg_ov_yerr
+                if self.scale_by_yerrs == True:
+                    emode_err *= self.Dnoise
                 if self.scale_by_std == True:
                     emode_err *= self.Dstd
                 recon_err = np.sqrt( np.array(map(lambda x: np.sum(x,axis=0),emode_err**2)) )
