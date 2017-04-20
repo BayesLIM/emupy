@@ -247,7 +247,7 @@ class Emu(object):
             self.Dstd = np.array(map(astats.biweight_midvariance,D.T))
             D /= self.Dstd
 
-        if self.scale_by_yerrs = True:
+        if self.scale_by_yerrs == True:
             if self.lognorm == True:
                 self.Dnoise = O.yerrs/O.ydata
             else:
