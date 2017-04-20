@@ -249,9 +249,9 @@ class Emu(object):
 
         if self.scale_by_yerrs == True:
             if self.lognorm == True:
-                self.Dnoise = O.yerrs/O.ydata
+                self.Dnoise = self.yerrs/self.ydata
             else:
-                self.Dnoise = O.yerrs
+                self.Dnoise = self.yerrs
             D /= self.Dnoise
 
         # Find Covariance
