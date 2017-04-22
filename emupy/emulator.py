@@ -516,12 +516,7 @@ class Emu(object):
         elif self.reg_meth == 'gaussian':
             # Initialize GP, fit to data
             GP = []
-            if verbose == True: print '...Eigenmode group variance divider = ',emode_variance_div
             for j in range(self.N_modegroups):
-                if verbose == True:
-                    print '...Working on eigenmode #'+str(j)
-                    print '-'*40
-
                 if gp_kwargs_arr is None:
                     gp_kwargs = self.gp_kwargs.copy()
                 else:
@@ -533,12 +528,18 @@ class Emu(object):
 
             # Fit GPs!
             # Use parallel processing for hyperparameter regression (optional)
+            def fit(gp, xdata, ydata, modegroups, verbose=False,  message=None):
+                gp.fit(xdata, ydata.T[modegroups].T)
+                if verbose==True:
+                    print(message)
+
             if pool is None:
                 M = map
             else:
                 M = pool.map
 
-            M(lambda x: x[0].fit(Xsph,y.T[self.modegroups[x[1]]].T), zip(GP,np.arange(len(GP))))
+            message = "...finished modegroup #"
+            M(lambda i: fit(GP[i], Xsph, y, self.modegroups[i], verbose=verbose, message=message+str(i)), np.arange(len(GP)))
             GP = np.array(GP)
             if pool is not None:
                 pool.close()
