@@ -273,10 +273,11 @@ class Emu(object):
         eig_vecs        = eig_vecs[:self.N_modes]
         w_tr            = w_tr[:,:self.N_modes]
         tot_var         = sum(eig_vals)
-        rec_var         = sum(eig_vals)
+        rec_var         = sum(eig_vals[:self.N_modes])
         frac_var        = rec_var/tot_var
 
         if normalize == True and w_norm is None:
+            w_norm = np.sqrt(eig_vals)
             w_norm = np.array(map(lambda x: astats.biweight_midvariance(x)*5, w_tr.T)).T
 
         elif normalize == True and w_norm is not None:
@@ -686,17 +687,19 @@ class Emu(object):
             else:
                 recon = weights
 
+        # Un-scale the data
         if self.scale_by_std == True:
             recon *= self.Dstd
 
         if self.scale_by_yerrs == True:
             recon *= self.Dnoise
 
+        # Un-center the data
+        recon += self.fid_data
+
+        # Un-log the data
         if self.lognorm == True:
             recon = np.exp(recon)
-            recon *= self.fid_data
-        else:
-            recon += self.fid_data
 
         # Calculate Error
         if fast == True:
