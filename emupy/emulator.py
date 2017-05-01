@@ -699,7 +699,7 @@ class Emu(object):
         if self.lognorm == True:
             recon = np.exp(recon) * self.fid_data
         else:
-            recon = += self.fid_data
+            recon += self.fid_data
 
         # Calculate Error
         if fast == True:
