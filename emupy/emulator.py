@@ -695,12 +695,11 @@ class Emu(object):
         if self.scale_by_yerrs == True:
             recon *= self.Dnoise
 
-        # Un-center the data
-        recon += self.fid_data
-
-        # Un-log the data
+        # Un-log and un-center the data
         if self.lognorm == True:
-            recon = np.exp(recon)
+            recon = np.exp(recon) * self.fid_data
+        else:
+            recon = += self.fid_data
 
         # Calculate Error
         if fast == True:
