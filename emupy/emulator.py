@@ -248,10 +248,11 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_yerrs == True:
-            if self.lognorm == True:
-                self.Dnoise = self.yerrs/self.ydata
-            else:
-                self.Dnoise = self.yerrs
+            if hasattr(self, 'Dnoise') == False:
+                if self.lognorm == True:
+                    self.Dnoise = self.yerrs/self.ydata
+                else:
+                    self.Dnoise = self.yerrs
             D /= self.Dnoise
 
         # Find Covariance
