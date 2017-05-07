@@ -358,6 +358,9 @@ class Emu(object):
         recon_data = []
         recon_cv = []
         recon_err_cv = []
+        weights_cv = []
+        weights_err_cv = []
+        weights_true = []
         for i in range(kfold_Nclus):
             print "...working on kfold clus "+str(i+1)+":\n"+"-"*26
             data_tr_temp = data_tr[~rando[i]]
@@ -370,13 +373,19 @@ class Emu(object):
             recon_err_cv.extend(self.recon_err_cv)
             recon_grid.extend(np.copy(grid_tr[rando[i]]))
             recon_data.extend(np.copy(data_tr[rando[i]]))
+            weights_cv.extend(self.weights_cv)
+            weights_err_cv.extend(self.weights_err_cv)
+            weights_true.extend(self.weights_true_cv)
 
         recon_cv = np.array(recon_cv)
         recon_err_cv = np.array(recon_err_cv)
         recon_grid = np.array(recon_grid)
         recon_data = np.array(recon_data)
+        weights_cv = np.array(weights_cv)
+        weights_err_cv = np.array(weights_err_cv)
+        weights_true = np.array(weights_true)
 
-        return recon_cv, recon_err_cv, recon_grid, recon_data, rando
+        return recon_cv, recon_err_cv, recon_grid, recon_data, weights_cv, weights_err_cv, weights_true, rando
 
     def cross_validate(self,grid_cv,data_cv,use_pca=True,predict_kwargs={},output=False,LAYG=False,use_tree=False,
                     vectorize=True,pool=None):
