@@ -253,6 +253,8 @@ class Emu(object):
                     self.Dnoise = self.yerrs/self.ydata
                 else:
                     self.Dnoise = self.yerrs
+            if hasattr(self, 'Dnoise_power') == True:
+                self.Dnoise = self.Dnoise**self.Dnoise_power
             D /= self.Dnoise
 
         # Find Covariance
