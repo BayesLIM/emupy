@@ -250,7 +250,7 @@ class Emu(object):
         if self.scale_by_yerrs == True:
             if hasattr(self, 'Dnoise') == False:
                 if self.lognorm == True:
-                    self.Dnoise = self.yerrs/self.ydata
+                    self.Dnoise = self.yerrs/fid_data
                 else:
                     self.Dnoise = self.yerrs
             if hasattr(self, 'Dnoise_power') == True:
