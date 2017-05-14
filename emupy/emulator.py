@@ -1,8 +1,11 @@
 """
 emulator.py
-==========
+============
 
-An emulator in python
+An emulator in Python
+
+Nicholas Kern
+nkern@berkeley.edu
 """
 
 # Import Modules
@@ -26,23 +29,78 @@ except: pass
 __all__ = ['Emu']
 
 class Emu(object):
-    ''' perform clustering, Karhunen Loeve Transform (PCA) and interpolation on data vector "data"
-    -- class klfuncs() needs to be fed a dictionary containing the relevant variables, depending on which sub-function will be used:
-        N_samples   : number of samples in training set, indexed with "i"
-        N_data      : number of data points in each sample, indexed with "k"
-        N_modes     : number of eigenmodes, indexed with "j"
-        N_params    : number of independent parameters in parameter space
-    '''
+    """
+    Emulator class object
+    ---------------------
 
-    def __init__(self,dic):
-        self.__name__ = 'Emu'
-        self.__dict__.update(dic)
-        self._trained = False
-        if hasattr(self, 'cov_est') == False:
-            self.cov_est = lambda x: np.cov(x, ddof=1)
+    In order for the methods of Emu to work properly, there are a few objects that
+    need to be attached to the class namespace beforehand. This varies slightly from 
+    method-to-method, but generally one will need those listed below. Note that one can
+    easily append/overwrite objects to the class namespace by feeding Emu.update(dic), 
+    where dic is a dictionary containing the objects.
+
+    grid_tr : ndarray [dtype=float, shape=(N_samples, N_dim)]
+        ndarray containing positions of training data in parameter space
+
+    data_tr : ndarray [dtype=float, shape=(N_samples, N_data)]
+        ndarray containing data of training data
+
+    fid_grid : ndarray [dtype=float, shape=(N_dim)]
+        average or fiducial parameter vector of training set
+
+    fid_data : ndarray [dtype=float, shape=(N_data)]
+        average or fiducial data vector of training data
+
+    cov_est : object [default=np.cov]
+        function object that is a covariance estimator
+
+    lognorm : bool [default=False]
+        if True, log-transform training data before emulation
+
+    scale_by_std : bool [default=False]
+        if True, scale training data by standard deviation
+        before emulation
+
+    scale_by_yerrs : bool [default=False]
+        if True, scale training data by observational errors
+        before emulation
+
+    rescale : ndarray [default=None]
+        if not None, rescaling matrix for rescaling training data
+        before emulation
+
+    rescale_power : float [default=None]
+        if note None, exponential of rescaling matrix before rescaling
+
+    recon_calib : float or ndarray [default=1.0]
+        multiplicative factor of emulator predicted reconstructions
+
+    recon_err_calib : float or ndarray [default=1.0]
+        multiplicative factor of emulator predicted reconstruction errors
+
+    w_norm : float or ndarray [default=1.0]
+        multiplicative factor of PCA weights before emulation
+
+    """
+
+    def __init__(self):
+        self.__name__           = 'Emu'
+        self._trained           = False
+        self.cov_est            = np.cov
+        self.lognorm            = False
+        self.scale_by_std       = False
+        self.scale_by_yerrs     = False
+        self.rescale            = None
+        self.rescale_power      = None
+        self.recon_calib        = 1.0
+        self.recon_err_calib    = 1.0
+        self.w_norm             = 1.0
 
     @property
     def print_pars(self):
+        """
+        print parameters in class dictionary
+        """
         keys = self.__dict__.keys()
         vals = self.__dict__.values()
         sort = np.argsort(keys)
@@ -52,63 +110,65 @@ class Emu(object):
                 string += keys[sort[i]] + '\r\t\t\t = ' + str(vals[sort[i]]) + '\n'
         print string
 
-    def update(self,dic):
-        self.__dict__.update(dic)
-
-    def param_check(self,data,params):
-        try:
-            if self.N_samples != data.shape[0]:
-                self.N_samples = data.shape[0]
-        except:
-            self.N_samples = data.shape[0]
-        try:
-            if self.N_data != data.shape[1]:
-                self.N_data = data.shape[1]
-        except:
-            try:
-                self.N_data = data.shape[1]
-            except:
-                self.N_data = len(data)
-        try:
-            if self.N_params != params.shape[1]:
-                self.N_params = params.shape[1]
-        except:
-            try:
-                self.N_params = params.shape[1]
-            except:
-                self.N_params = len(params)
-
-    def keep_file(self,filelist,string):
-        '''if string in filelist, keep file'''
-        return np.array(fnmatch.filter(filelist,string))
-
-    def sphere(self,params,fid_params=None,save_chol=False,invL=None,attach=True,norotate=False):
+    def update(self, dic):
         """
-        Perform Cholesky decomposition and whiten or 'sphere' the data into non-covarying basis
-        Xcov must be positive definite
+        update class dictionary
+
         Input:
         ------
-
-        norotate : bool (default=False)
-            Ensure the coordinate system is not rotated when sphereing
+        dic : dictionary
         """
-        if fid_params is None:
-            fid_params = np.array(map(np.median,params.T))
+        self.__dict__.update(dic)
+
+    def sphere(self, grid, fid_grid=None, save_chol=False, invL=None, attach=True, norotate=False):
+        """
+        Perform Cholesky decomposition to sphere data into whitened basis
+
+        Input:
+        ------
+        grid : ndarray [arg, dtype=float, shape=(N_samples, N_dim)]
+            ndarray of N_samples grid points in an N_dim dimensional parameter space
+
+        fid_grid : ndarray [kwarg, dtype=float, shape=(N_dim,), default=None]
+            1D numpy array of average (or fiducial) grid point
+
+        save_chol : bool [kwarg, default=False]
+            if True, overwrite the used Cholesky to class namespace 
+
+        invL : ndarray [kwwarg, dtype=float, shape=(N_dim, N_dim), default=None]
+            precomputed inverse cholesky to use for whitening
+
+        attach : bool [kwarg, default=True]
+            if True, attach sphered grid ("Xsph") to class namespace
+
+        norotate : bool [kwarg, default=False]
+            if True, set off-diagonal elements of Cholesky to zero, such that
+            the whitened basis is aligned with cartesian axis. 
+
+        Requires:
+        ---------
+        cov_est : class method
+            covariance estimator
+        """
+        # Get fiducial points
+        if fid_grid is None:
+            fid_grid = np.array(map(np.median,grid.T))
 
         # Subtract mean
-        X = params - fid_params
+        X = grid - fid_grid
 
-        # Find cholesky
         if invL is None:
             # Find Covariance
             Xcov = self.cov_est(X.T)# np.cov(X.T, ddof=1) #np.inner(X.T,X.T)/self.N_samples
             if Xcov.ndim < 2:
                 Xcov = np.array([[Xcov]])
+            # Find cholesky
             L = la.cholesky(Xcov).T
             if norotate == True:
                 L = np.eye(len(L)) * L.diagonal()
             invL = la.inv(L)
 
+        # Save cholesky
         if save_chol == True:
             self.grid_tr = params
             self.fid_params = fid_params
@@ -122,7 +182,28 @@ class Emu(object):
         else:
             return Xsph
 
-    def create_tree(self,data,tree_type='ball',leaf_size=100,metric='euclidean'):
+    def create_tree(self, data, tree_type='ball', leaf_size=100, metric='euclidean'):
+        """
+        create tree structure from grid points
+
+        Input:
+        ------
+        grid : ndarray [arg, dtype=float, shape=(N_samples, N_dim)]
+            ndarray of grid points in parameter space
+
+        tree_type : str [kwarg, default='ball', options=('ball','kd')]
+            type of tree to make
+
+        leaf_size : int [kwarg, default=100]
+            tree leaf size, see sklearn.neighbors documentation for details
+
+        metric : str [kwarg, default='euclidean']
+            distance metric, see sklearn.neighbors documentation for details
+
+        Output:
+        -------
+        no output, creates self.tree object
+        """
         if tree_type == 'ball':
             self.tree = neighbors.BallTree(data,leaf_size=leaf_size,metric=metric)
         elif tree_type == 'kd':
@@ -130,11 +211,27 @@ class Emu(object):
 
     def nearest(self, theta, k=10, use_tree=False):
         """
-        Get Nearest Neighbors from sphered theta
+        perform a nearest neighbor search of grid from theta
+
+        Input:
+        ------
+        theta : ndarray [arg, dtype=float, shape=(N_dim)]
+            point in parameter space to perform nearest neighbor search from
+
+        k : int [kwarg, default=10]
+            number of nearest neighbors to query
+
+        use_tree : bool [kwarg, default=False]
+            if True, use tree structure to make query, else use brute-force search
+
+        Output:
+        -------
+
         """
         if use_tree == True:
-            if 'tree' not in self.__dict__:
-                self.sphere(self.grid_tr, fid_params=self.fid_params, invL=self.invL)
+            if hasattr(self, 'tree')
+                # Make tree if not present
+                self.sphere(self.grid_tr, fid_grid=self.fid_grid, invL=self.invL)
                 self.create_tree(self.Xsph)
             grid_D, grid_NN = self.tree.query(theta, k=k+1)
             if theta.ndim == 1:
@@ -248,14 +345,14 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_yerrs == True:
-            if hasattr(self, 'Dnoise') == False:
+            if self.rescale is not None:
                 if self.lognorm == True:
-                    self.Dnoise = self.yerrs/fid_data
+                    self.rescale = self.yerrs/fid_data
                 else:
-                    self.Dnoise = self.yerrs
-            if hasattr(self, 'Dnoise_power') == True:
-                self.Dnoise = self.Dnoise**self.Dnoise_power
-            D /= self.Dnoise
+                    self.rescale = self.yerrs
+            if self.rescale_power is not None:
+                self.rescale = self.rescale**self.rescale_power
+            D /= self.rescale
 
         # Find Covariance
         Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
@@ -309,7 +406,7 @@ class Emu(object):
             D /= self.Dstd
 
         if self.scale_by_yerrs == True:
-            D /= self.Dnoise
+            D /= self.rescale
 
         # Project onto eigenvectors
         self.w_tr = np.dot(D,self.eig_vecs.T)
@@ -705,7 +802,7 @@ class Emu(object):
             recon *= self.Dstd
 
         if self.scale_by_yerrs == True:
-            recon *= self.Dnoise
+            recon *= self.rescale
 
         # Un-log and un-center the data
         if self.lognorm == True:
@@ -722,7 +819,7 @@ class Emu(object):
             if use_pca == True:
                 emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
                 if self.scale_by_yerrs == True:
-                    emode_err *= self.Dnoise
+                    emode_err *= self.rescale
                 if self.scale_by_std == True:
                     emode_err *= self.Dstd
                 recon_err = np.sqrt( np.array(map(lambda x: np.sum(x,axis=0),emode_err**2)) )
