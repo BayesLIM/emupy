@@ -319,7 +319,7 @@ class Emu(object):
             sq_err = np.abs(np.dot(resid.T,resid)/(Ashape[0]-Ashape[1]))
             return xhat, np.sqrt(sq_err)
 
-    def klt(self, data_tr, fid_data=None, normalize=False, w_norm=None):
+    def klt(self, data_tr, fid_data=None, normalize=False):
         """
         Perform eigenvector decomposition, aka "Karhunen Loeve Transform" (KLT)
 
@@ -645,7 +645,7 @@ class Emu(object):
             self.sphere(grid,fid_grid=fid_grid,norotate=norotate)
             Xsph = self.Xsph
         else:
-            Xsph = np.dot(self.invL, (grid-fid_grid).T).T
+            Xsph = np.dot(invL, (grid-fid_grid).T).T
 
         # Compute y vector
         if compute_klt == True and use_pca == True:
