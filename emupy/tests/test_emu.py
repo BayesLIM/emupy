@@ -37,7 +37,8 @@ class TestEmu(unittest.TestCase):
         N_modes = N_data
         variables = {'reg_meth':'gaussian','gp_kwargs':{},'N_modes':N_modes,'N_samples':N_samples,
                 'cov_whiten':False,'cov_rescale':False,'lognorm':False}
-        E = Emu(variables)
+        E = Emu()
+        E.update(variables)
 
         E.sphere(grid_tr, save_chol=True)
 
@@ -57,7 +58,8 @@ class TestEmu(unittest.TestCase):
         """
         # Generate Random sample
         d = np.vstack([stats.norm.rvs(100,10,1000), stats.norm.rvs(0.5,0.1,1000)]).T
-        E = Emu({'N_samples':1000})
+        E = Emu()
+        E.N_samples = 1000
         E.sphere(d, save_chol=True)
         if E.Xsph.T[0].max() > 10 and E.Xsph.T[0].min() < -10:
             print("Cholesky probably not working correctly, perhaps la.cholesky(Xcov) is transposed?")
