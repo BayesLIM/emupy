@@ -588,7 +588,7 @@ class Emu(object):
 
     def train(self, data, grid,
             fid_data=None, fid_grid=None, noise_var=None, gp_kwargs_arr=None, emode_variance_div=1.0,
-            use_pca=True, compute_klt=True, verbose=False, group_modes=False, invL=None,
+            use_pca=True, compute_klt=False, verbose=False, group_modes=False, invL=None,
             pool=None, norotate=False):
         """
         Train emulator surrogate models
@@ -607,7 +607,7 @@ class Emu(object):
         fid_grid : ndarray [kwarg, dtype=float, shape=(N_dim,)]
             1Darray of fiducial parameter vector
 
-        compute_klt : bool [kwarg, default=True]
+        compute_klt : bool [kwarg, default=False]
             if True, recompute KLT with "data" ndarray as input
       
         invL : ndarray [kwarg, default=None]
