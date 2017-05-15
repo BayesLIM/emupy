@@ -908,7 +908,7 @@ class Emu(object):
         if self.cov_whiten == True:
             recon *= self.Dstd
 
-        if self.cov_rescales == True:
+        if self.cov_rescale == True:
             recon *= self.rescale
 
         # Un-log and un-center the data
