@@ -78,7 +78,7 @@ class Emu(object):
     recon_err_calib : float or ndarray [default=1.0]
         multiplicative factor of emulator predicted reconstruction errors
 
-    w_norm : float or ndarray [default=1.0]
+    w_norm : float or ndarray [default=None]
         multiplicative factor of PCA weights before emulation
 
     reg_meth : str [default='gaussian', options=('gaussian','poly')]
@@ -95,7 +95,7 @@ class Emu(object):
         self.rescale_power      = None
         self.recon_calib        = 1.0
         self.recon_err_calib    = 1.0
-        self.w_norm             = 1.0
+        self.w_norm             = None
         self.reg_meth           = 'gaussian'
 
     @property
@@ -334,14 +334,15 @@ class Emu(object):
         normalize : bool [kwarg, default=False]
             if True, normalize PCA weights to have variance of unity
 
-        w_norm : ndarray [kwarg, dtype=float, default=None]
-            Normalization vector for PCA weights
-            if None and normalize == True, taken to be sqrt of eigenvalues
-
         Optional:
         ---------
         self.N_modes : int [default=N_data]
             specify N_modes to determine number of PCA eigenmodes to keep during truncation
+
+        self.w_norm : ndarray [kwarg, dtype=float, default=None]
+            Normalization vector for PCA weights
+            if None and normalize == True, taken to be sqrt of eigenvalues
+
 
         Result:
         -------
@@ -401,19 +402,19 @@ class Emu(object):
         rec_var         = sum(eig_vals[:self.N_modes])
         frac_var        = rec_var/tot_var
 
-        if normalize == True and w_norm is None:
-            w_norm = np.sqrt(eig_vals)
+        if normalize == True and self.w_norm is None:
+            self.w_norm = np.sqrt(eig_vals)
 
-        elif normalize == True and w_norm is not None:
-            w_norm = w_norm
+        elif normalize == True and self.w_norm is not None:
+            self.w_norm = self.w_norm
 
         elif normalize == False:
-            w_norm = np.ones(self.N_modes)
+            self.w_norm = np.ones(self.N_modes)
 
-        w_tr /= w_norm
+        w_tr /= self.w_norm
 
         # Update to Namespace
-        names = ['D','data_tr','Dcov','eig_vals','eig_vecs','w_tr','tot_var','rec_var','frac_var','fid_data','w_norm']
+        names = ['D','data_tr','Dcov','eig_vals','eig_vecs','w_tr','tot_var','rec_var','frac_var','fid_data']
         self.update(ezcreate(names,locals()))
 
     def klt_project(self, data):

@@ -5,7 +5,8 @@ Code Repo : https://github.com/nkern/emupy
 
 ### About
 **emupy** is a generalized Python implementation of the emulator algorithm detailed in Kern et al. 2017,
-and includes methods for Principcal Component Analysis (PCA) and Gaussian Process Regression
+and includes methods for Principcal Component Analysis (PCA) and Gaussian Process Regression. It is currently
+only compatible with Python 2.7
 
 ### Dependencies
 - numpy >= 1.10.4
@@ -20,4 +21,4 @@ python setup.py install
 ```
 
 ### Running
-See Examples for ways to run the code
+See Examples for demonstrations of how to run the code
