@@ -57,20 +57,20 @@ class Emu(object):
     lognorm : bool [default=False]
         if True, log-transform training data before emulation
 
-    scale_by_std : bool [default=False]
+    cov_whiten : bool [default=False]
         if True, scale training data by standard deviation
-        before emulation
+        before emulation to whiten its covariance matrix
 
-    scale_by_yerrs : bool [default=False]
-        if True, scale training data by observational errors
-        before emulation
+    cov_rescale : bool [default=False]
+        if True, scale training data by rescaling matrix (default is
+        observational errors if True) before emulation
 
     rescale : ndarray [default=None]
         if not None, rescaling matrix for rescaling training data
         before emulation
 
     rescale_power : float [default=None]
-        if note None, exponential of rescaling matrix before rescaling
+        if not None, exponential of rescaling matrix before rescaling
 
     recon_calib : float or ndarray [default=1.0]
         multiplicative factor of emulator predicted reconstructions
@@ -81,20 +81,22 @@ class Emu(object):
     w_norm : float or ndarray [default=1.0]
         multiplicative factor of PCA weights before emulation
 
+    reg_meth : str [default='gaussian', options=('gaussian','poly')]
+        regression method. Currently only 'gaussian' works
     """
-
     def __init__(self):
         self.__name__           = 'Emu'
         self._trained           = False
         self.cov_est            = np.cov
         self.lognorm            = False
-        self.scale_by_std       = False
-        self.scale_by_yerrs     = False
+        self.cov_whiten         = False
+        self.cov_rescale        = False
         self.rescale            = None
         self.rescale_power      = None
         self.recon_calib        = 1.0
         self.recon_err_calib    = 1.0
         self.w_norm             = 1.0
+        self.reg_meth           = 'gaussian'
 
     @property
     def print_pars(self):
@@ -144,11 +146,6 @@ class Emu(object):
         norotate : bool [kwarg, default=False]
             if True, set off-diagonal elements of Cholesky to zero, such that
             the whitened basis is aligned with cartesian axis. 
-
-        Requires:
-        ---------
-        cov_est : class method
-            covariance estimator
         """
         # Get fiducial points
         if fid_grid is None:
@@ -171,7 +168,7 @@ class Emu(object):
         # Save cholesky
         if save_chol == True:
             self.grid_tr = params
-            self.fid_params = fid_params
+            self.fid_grid = fid_grid
             self.L = L
             self.invL = invL
 
@@ -182,7 +179,7 @@ class Emu(object):
         else:
             return Xsph
 
-    def create_tree(self, data, tree_type='ball', leaf_size=100, metric='euclidean'):
+    def create_tree(self, grid, tree_type='ball', leaf_size=100, metric='euclidean'):
         """
         create tree structure from grid points
 
@@ -205,9 +202,9 @@ class Emu(object):
         no output, creates self.tree object
         """
         if tree_type == 'ball':
-            self.tree = neighbors.BallTree(data,leaf_size=leaf_size,metric=metric)
+            self.tree = neighbors.BallTree(grid,leaf_size=leaf_size,metric=metric)
         elif tree_type == 'kd':
-            self.tree = neighbors.KDTree(data,leaf_size=leaf_size,metric=metric)
+            self.tree = neighbors.KDTree(grid,leaf_size=leaf_size,metric=metric)
 
     def nearest(self, theta, k=10, use_tree=False):
         """
@@ -226,10 +223,16 @@ class Emu(object):
 
         Output:
         -------
+        return grid_D, grid_NN
 
+        grid_D : ndarray
+            ndarray containing distances of nearest neighbor points
+
+        grid_NN : ndarray
+            ndarray containing indices of nearest neighbor points in "grid_tr" array
         """
         if use_tree == True:
-            if hasattr(self, 'tree')
+            if hasattr(self, 'tree') == False:
                 # Make tree if not present
                 self.sphere(self.grid_tr, fid_grid=self.fid_grid, invL=self.invL)
                 self.create_tree(self.Xsph)
@@ -287,7 +290,6 @@ class Emu(object):
         for i in range(dim):
             dims.append(to_the_power(Xrange[i],perms.T[i]).T)
         dims = np.array(dims)
-
         A = np.array(map(lambda y: map(lambda x: functools.reduce(operator.mul,x),y),dims.T)).T
 
         return A
@@ -317,16 +319,36 @@ class Emu(object):
             sq_err = np.abs(np.dot(resid.T,resid)/(Ashape[0]-Ashape[1]))
             return xhat, np.sqrt(sq_err)
 
-    def klt(self,data_tr,fid_data=None,normalize=False,w_norm=None):
-        ''' compute KL transform and calculate eigenvector weights for each sample in training set (TS)
-            data        : [N_samples, N_data] 2D matrix, containing data of TS
-            fid_data    : [N_data] row vector, containing fiducial data
+    def klt(self, data_tr, fid_data=None, normalize=False, w_norm=None):
+        """
+        Perform eigenvector decomposition, aka "Karhunen Loeve Transform" (KLT)
 
-            Necessary parameters when initializing klfuncs:
-            N_modes     : scalar, number of eigenmodes to keep after truncation
-            N_samples   : scalar, number of samples in training set
-        '''
-        
+        Input:
+        ------
+        data_tr : ndarray [arg, dtype=float, shape=(N_samples, N_data)]
+            ndarray containing training data of training set
+
+        fid_data : ndarray [kwarg, dtype=float, default=None]
+            1D array containing data vector of average (or fiducial) data set
+
+        normalize : bool [kwarg, default=False]
+            if True, normalize PCA weights to have variance of unity
+
+        w_norm : ndarray [kwarg, dtype=float, default=None]
+            Normalization vector for PCA weights
+            if None and normalize == True, taken to be sqrt of eigenvalues
+
+        Optional:
+        ---------
+        self.N_modes : int [default=N_data]
+            specify N_modes to determine number of PCA eigenmodes to keep during truncation
+
+        Result:
+        -------
+        self.eig_vecs : ndarray [dtype=float, shape=(N_data, N_modes)]
+
+
+        """
         # Compute fiducial data set
         if fid_data is None:
             if self.lognorm == True:
@@ -340,11 +362,11 @@ class Emu(object):
         else:
             D = (data_tr - fid_data)
 
-        if self.scale_by_std == True:
+        if self.cov_whiten == True:
             self.Dstd = np.array(map(astats.biweight_midvariance,D.T))
             D /= self.Dstd
 
-        if self.scale_by_yerrs == True:
+        if self.cov_rescale == True:
             if self.rescale is not None:
                 if self.lognorm == True:
                     self.rescale = self.yerrs/fid_data
@@ -369,6 +391,9 @@ class Emu(object):
         w_tr = np.dot(D,eig_vecs.T)
 
         # Truncate eigenmodes to N_modes # of modes
+        if hasattr(self, 'N_modes') == False:
+            self.N_modes = len(eig_vals)
+
         eig_vals        = eig_vals[:self.N_modes]
         eig_vecs        = eig_vecs[:self.N_modes]
         w_tr            = w_tr[:,:self.N_modes]
@@ -378,7 +403,6 @@ class Emu(object):
 
         if normalize == True and w_norm is None:
             w_norm = np.sqrt(eig_vals)
-            w_norm = np.array(map(lambda x: astats.biweight_midvariance(x)*5, w_tr.T)).T
 
         elif normalize == True and w_norm is not None:
             w_norm = w_norm
@@ -392,20 +416,31 @@ class Emu(object):
         names = ['D','data_tr','Dcov','eig_vals','eig_vecs','w_tr','tot_var','rec_var','frac_var','fid_data','w_norm']
         self.update(ezcreate(names,locals()))
 
-    def klt_project(self,data):
-        '''
-        Having already run klt() to get eigenvectors and eigenvalues, project vector 'data' onto eigenmodes
-        '''
+    def klt_project(self, data):
+        """
+        Having previously run self.klt(), project "data" onto previously solved-for eigenmodes
+        to get eigenmode weights
+
+        Input:
+        ------
+        data : ndarray [arg, dtype=float, shape=(N_samples, N_data)]
+            ndarray of data
+
+        Output:
+        -------
+        self.w_tr : ndarray
+            "true weights" of data projected onto self.eigenmodes (after weight normalization)
+        """
         # Subtract fiducial data from data
         if self.lognorm == True:
             D = np.log(data / self.fid_data)
         else:
             D = data - self.fid_data
 
-        if self.scale_by_std == True:
+        if self.cov_whiten == True:
             D /= self.Dstd
 
-        if self.scale_by_yerrs == True:
+        if self.rescale == True:
             D /= self.rescale
 
         # Project onto eigenvectors
@@ -445,6 +480,11 @@ class Emu(object):
         recon_cv
         recon_err_cv
         recon_grid
+        recon_data
+        weights_cv
+        weights_err_cv
+        weights_true
+        rando
         """
         # Assign random cv sets
         if rando is None:
@@ -466,7 +506,7 @@ class Emu(object):
             data_tr_temp = data_tr[~rando[i]]
             grid_tr_temp = grid_tr[~rando[i]]
             # Train     
-            self.train(data_tr_temp,grid_tr_temp,fid_data=self.fid_data,fid_params=self.fid_params,**kwargs_tr)
+            self.train(data_tr_temp,grid_tr_temp,fid_data=self.fid_data,fid_grid=self.fid_grid,**kwargs_tr)
             # Cross Valid
             self.cross_validate(grid_tr[rando[i]], data_tr[rando[i]], use_pca=use_pca, predict_kwargs=predict_kwargs, vectorize=vectorize)
             recon_cv.extend(self.recon_cv)
@@ -545,30 +585,66 @@ class Emu(object):
         if output == True:
             return self.recon_cv, self.recon_err_cv, self.recon_err_cov, self.weights_cv, self.weights_err_cv
 
-    def train(self,data,grid,
-            fid_data=None,fid_params=None,noise_var=None,gp_kwargs_arr=None,emode_variance_div=1.0,
-            use_pca=True,compute_klt=True,norm_noise=False,verbose=False,
-            group_modes=False,save_chol=False,invL=None,fast=False,pool=None,norotate=False):
-        ''' fit regression model to then be used for interpolation
-            noise_var   : [N_samples] row vector with noise variance for each sample in LLS solution
+    def train(self, data, grid,
+            fid_data=None, fid_grid=None, noise_var=None, gp_kwargs_arr=None, emode_variance_div=1.0,
+            use_pca=True, compute_klt=True, verbose=False, group_modes=False, invL=None,
+            pool=None, norotate=False):
+        """
+        Train emulator surrogate models
 
-            Necessary parameters when initializing klfuncs:
-            N_samples   : scalar, number of samples in TS
-            poly_deg    : degree of polynomial to fit for
-            scale_by_std    : scale data by its standard dev
-            reg_meth    : method of regression, ['poly','gaussian']
-            klt() variables
-            gp_kwargs variables
-        '''
-        # Check parameters are correct
-        self.param_check(data,grid)
+        Input:
+        ------
+        data : ndarray [arg, dtype=float, shape=(N_samples, N_data)]
+            ndarray of training data containing N_samples # of data vectors each with N_data elements
 
+        grid : ndarray [arg, dtype=float, shape=(N_samples, N_dim)]
+            ndarray of training set parameter vectors
+
+        fid_data : ndarray [kwarg, dtype=float, shape=(N_data,)]
+            1Darray of fiducial or average data vector of training data
+
+        fid_grid : ndarray [kwarg, dtype=float, shape=(N_dim,)]
+            1Darray of fiducial parameter vector
+
+        compute_klt : bool [kwarg, default=True]
+            if True, recompute KLT with "data" ndarray as input
+      
+        invL : ndarray [kwarg, default=None]
+            inverse Cholesky to use in sphering of "grid" matrix
+
+        gp_kwargs_arr : list [kwarg, default=None]
+            a list containing dictionaries of the Gaussian Process initialization kwargs
+            for each invididual Gaussian Process if None, use self.gp_kwargs dictionary for all GPs
+
+        use_pca : bool [kwarg, default=True]
+            if True, use PCA to break down data into weights
+            else, don't use PCA, such that "weights" are actually data itself
+
+        group_modes : bool [kwarg, default=False]
+            if True, group eigenmode prediction together into "modegroups"
+
+        emode_variance_div : float [kwarg, default=1.0]
+            multiplicative factor used in dividing up eigenmodes into modegroups based on their eigenvalues (variance)
+            if emode_variance_div == 1.0, no modegrouping
+            elif emode_variance_div > 1.0, modegrouping
+
+        norotate : bool [kwarg, default=False]
+            norotate kwarg fed into KLT if invL is None
+
+        pool : pool object [kwarg, default=None]
+            pool object used for multiprocessing of training
+
+        Result:
+        -------
+        self.GP : list
+            a list containing the trained surrogate models of length self.N_modegroups
+        """
         # Sphere parameter space vector
         if invL is None:
-            self.sphere(grid,fid_params=fid_params,norotate=norotate)
+            self.sphere(grid,fid_grid=fid_grid,norotate=norotate)
             Xsph = self.Xsph
         else:
-            Xsph = np.dot(self.invL, (grid-fid_params).T).T
+            Xsph = np.dot(self.invL, (grid-fid_grid).T).T
 
         # Compute y vector
         if compute_klt == True and use_pca == True:
@@ -667,7 +743,7 @@ class Emu(object):
         ------
         """
         # Rescale grid
-        grid_od = np.array(map(lambda x: np.dot(self.invL, (x - self.fid_params).T).T, grid_od))
+        grid_od = np.array(map(lambda x: np.dot(self.invL, (x - self.fid_grid).T).T, grid_od))
 
         # Solve for weights
         self.klt_project(data_od)
@@ -714,47 +790,77 @@ class Emu(object):
             self.N_modegroups = N_modegroups
             self.modegroups = modegroups
 
-    def predict(self,Xpred,use_Nmodes=None,fast=False,pool=None,\
-        use_pca=True,sphere=True,output=False,kwargs_tr={},LAYG=False,k=50,use_tree=True):
-        '''
-        - param_vals is ndarray with shape [N_params,N_samples]
+    def predict(self, grid_pred, use_Nmodes=None, fast=False, pool=None,
+        use_pca=True, sphere=True, output=False, kwargs_tr={}, LAYG=False, k=50, use_tree=True):
+        """
+        Make emulator prediction(s) of training data at new points in parameter space
 
-        - transform param_vals to Sphered_Param_Vals
-        - calculate eigenmode construction of predicted signal given param_vals
-        eigenmode = weights * eigenvector = w_tr * f_j
-        - given a list of parameter vals (ex. [[0.85],[40000.0],[30.0]]) and assuming eigenmodes
-        and the best-fit polynomial of their weights have been trained over a training set,
-        calculate the weight constants (w_tr) of each eigenmode
-        '''
-        # Ensure Xpred isn't a row vector
-        if Xpred.ndim == 1:
-            Xpred = Xpred.reshape(1,-1)
+        Input:
+        ------
+
+        grid_pred : ndarray [arg, dtype=float, shape=(N_samples, N_dim)]
+            ndarray containing parameter vectors at places where one wants emulator predictions
+
+        fast : bool [kwarg, default=False]
+            if True, don't return GP covariance estimate along with mean estimate
+
+        sphere : bool [kwarg, default=True]
+            if True, sphere grid_pred before prediction
+
+        LAYG : bool [kwarg, default=False]
+            if True, perform Learn-As-You-Go emulation
+
+        output : bool [kwarg, default=False]
+            if True, output results
+            else, attach results to class
+
+        kwargs_tr : dictionary [kwarg, default={}]
+            dictionary containing kwargs for self.train() if training on-the-fly
+
+        Result:
+        -------
+        recon : ndarray [shape=(N_samples, N_data)]
+            reconstruction (or prediction) of data vector at grid_pred
+
+        recon_err : ndarray [shape=(N_samples, N_data)]
+            estimated error of recon
+
+        recon_err_cov : ndarray [shape=(N_samples, N_data, N_data)]
+            estimated error covariance matrix of recon
+
+        weights : ndarray [shape=(N_samples, N_modes)]
+            ndarray of eigenmode weights
+
+        """
+        # Ensure grid_pred isn't a row vector
+        if grid_pred.ndim == 1:
+            grid_pred = grid_pred.reshape(1,-1)
 
         # Chi Square Multiplier, 95% prob
         self.csm = np.sqrt([3.841,5.991,7.815,9.488,11.070,12.592,14.067,15.507,16.919])
 
         # Transform to whitened parameter space
-        Xpred_shape = Xpred.shape
+        grid_pred_shape = grid_pred.shape
         if sphere == True:
-            Xpred_sph = np.dot(self.invL,(Xpred-self.fid_params).T).T
+            grid_pred_sph = np.dot(self.invL,(grid_pred-self.fid_grid).T).T
         else:
-            Xpred_sph = Xpred
+            grid_pred_sph = grid_pred
 
         if use_Nmodes is None:
             use_Nmodes = self.N_modes
 
         # Check for LAYG
         if LAYG == True:
-            self.sphere(self.grid_tr, fid_params=self.fid_params, invL=self.invL)
-            grid_NN = self.nearest(Xpred_sph.ravel(), k=k, use_tree=use_tree)[1]
+            self.sphere(self.grid_tr, fid_grid=self.fid_grid, invL=self.invL)
+            grid_NN = self.nearest(grid_pred_sph.ravel(), k=k, use_tree=use_tree)[1]
             self.train(self.data_tr[grid_NN],self.grid_tr[grid_NN],fid_data=self.fid_data,
-                            fid_params=self.fid_params,**kwargs_tr)
+                            fid_grid=self.fid_grid,**kwargs_tr)
 
         # Polynomial Interpolation
         if self.reg_meth == 'poly':
             # Calculate weights
-            if Xpred_sph.ndim == 1: Xpred_sph = Xpred_sph.reshape(1,len(Xpred_sph))
-            A = self.poly_design_mat(Xpred_sph.T,dim=self.N_params,degree=self.poly_deg)
+            if grid_pred_sph.ndim == 1: grid_pred_sph = grid_pred_sph.reshape(1,len(grid_pred_sph))
+            A = self.poly_design_mat(grid_pred_sph.T,dim=self.N_params,degree=self.poly_deg)
             weights = np.dot(A,self.xhat)
 
             # Renormalize weights
@@ -771,9 +877,9 @@ class Emu(object):
         # Gaussian Process Interpolation
         if self.reg_meth == 'gaussian':
             # Iterate over GPs
-            weights, MSE = np.zeros((len(Xpred_sph), self.N_modes)), np.zeros((len(Xpred_sph), self.N_modes))
+            weights, MSE = np.zeros((len(grid_pred_sph), self.N_modes)), np.zeros((len(grid_pred_sph), self.N_modes))
             for i in range(len(self.GP)):
-                result = self.GP[i].predict(Xpred_sph, return_cov=(fast==False))
+                result = self.GP[i].predict(grid_pred_sph, return_cov=(fast==False))
                 if fast == True:
                     w = np.array(result)
                     mse = np.zeros(w.shape)
@@ -798,10 +904,10 @@ class Emu(object):
                 recon = weights
 
         # Un-scale the data
-        if self.scale_by_std == True:
+        if self.cov_whiten == True:
             recon *= self.Dstd
 
-        if self.scale_by_yerrs == True:
+        if self.cov_rescales == True:
             recon *= self.rescale
 
         # Un-log and un-center the data
@@ -812,15 +918,15 @@ class Emu(object):
 
         # Calculate Error
         if fast == True:
-            recon_err = np.zeros((len(Xpred_sph), self.eig_vecs.shape[1]))
-            recon_err_cov = np.zeros((len(Xpred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
+            recon_err = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1]))
+            recon_err_cov = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
 
         else:
             if use_pca == True:
                 emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
-                if self.scale_by_yerrs == True:
+                if self.cov_rescale == True:
                     emode_err *= self.rescale
-                if self.scale_by_std == True:
+                if self.cov_whiten == True:
                     emode_err *= self.Dstd
                 recon_err = np.sqrt( np.array(map(lambda x: np.sum(x,axis=0),emode_err**2)) )
                 recon_err_cov = np.sum([[np.outer(emode_err[i,j], emode_err[i,j]) for j in range(self.N_modes)] for i in range(len(recon))], axis=1)
@@ -843,7 +949,7 @@ class Emu(object):
 
         # Construct data product and error on data product
         if fast == False:
-            names = ['recon','weights','MSE','weights_err','Xpred_sph','recon_err','recon_err_cov']
+            names = ['recon','weights','MSE','weights_err','grid_pred_sph','recon_err','recon_err_cov']
             self.update(ezcreate(names,locals()))
         else:
             self.recon = recon

@@ -36,15 +36,15 @@ class TestEmu(unittest.TestCase):
         # Instantiate
         N_modes = N_data
         variables = {'reg_meth':'gaussian','gp_kwargs':{},'N_modes':N_modes,'N_samples':N_samples,
-                'scale_by_std':False,'scale_by_obs_errs':False,'lognorm':False}
+                'cov_whiten':False,'cov_rescale':False,'lognorm':False}
         E = Emu(variables)
 
         E.sphere(grid_tr, save_chol=True)
 
         # Train
-        E.fid_params = np.array([5.0])
-        E.fid_data = E.fid_params[0]*X
-        E.train(data_tr, grid_tr, fid_data=E.fid_data, fid_params=E.fid_params, use_pca=False, invL=E.invL)
+        E.fid_grid = np.array([5.0])
+        E.fid_data = E.fid_grid[0]*X
+        E.train(data_tr, grid_tr, fid_data=E.fid_data, fid_grid=E.fid_grid, use_pca=False, invL=E.invL)
         E.w_norm = np.ones(N_modes)
         E.recon_err_norm = np.ones(N_data)
 
