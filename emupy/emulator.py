@@ -167,7 +167,7 @@ class Emu(object):
 
         # Save cholesky
         if save_chol == True:
-            self.grid_tr = params
+            self.grid_tr = grid
             self.fid_grid = fid_grid
             self.L = L
             self.invL = invL
