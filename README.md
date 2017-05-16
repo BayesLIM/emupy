@@ -18,6 +18,7 @@ only compatible with Python 2.7
 To install, clone the repo, cd into it and run the setup.py script
 ```bash
 python setup.py install
+```
 
 ### Running:
 See Examples for demonstrations of how to run the code
