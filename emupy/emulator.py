@@ -348,7 +348,6 @@ class Emu(object):
         -------
         self.eig_vecs : ndarray [dtype=float, shape=(N_data, N_modes)]
 
-
         """
         # Compute fiducial data set
         if fid_data is None:
