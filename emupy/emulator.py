@@ -885,7 +885,7 @@ class Emu(object):
                     mse = np.zeros(w.shape)
                 else:
                     w = np.array(result[0])
-                    mse = np.array([np.sqrt(np.array(result[1]).diagonal()) for i in range(len(self.modegroups[i]))]).T
+                    mse = np.array([np.sqrt(np.array(result[1]).diagonal()) for j in range(len(self.modegroups[i]))]).T
                 weights[:,self.modegroups[i]] = w.copy()
                 MSE[:,self.modegroups[i]] = mse.copy()
 
