@@ -444,8 +444,8 @@ class Emu(object):
             D /= self.rescale
 
         # Project onto eigenvectors
-        self.w_tr = np.dot(D,self.eig_vecs.T)
-        self.w_tr /= self.w_norm
+        self.w_true = np.dot(D,self.eig_vecs.T)
+        self.w_tr = self.w_true / self.w_norm
 
     def kfold_cv(self,grid_tr,data_tr,use_pca=True,predict_kwargs={},
                    rando=None, kfold_Nclus=None, kfold_Nsamp=None, kwargs_tr={},
@@ -724,7 +724,7 @@ class Emu(object):
                 M = pool.map
 
             message = "...finished modegroup #"
-            M(lambda i: fit(GP[i], Xsph, y, self.modegroups[i], verbose=verbose, message=message+str(i)), np.arange(len(GP)))
+            M(lambda i: fit(GP[i], Xsph, y.T[i], self.modegroups[i], verbose=verbose, message=message+str(i)), np.arange(len(GP)))
             GP = np.array(GP)
             if pool is not None:
                 pool.close()
