@@ -724,7 +724,7 @@ class Emu(object):
                 M = pool.map
 
             message = "...finished modegroup #"
-            M(lambda i: fit(GP[i], Xsph, y.T[i], self.modegroups[i], verbose=verbose, message=message+str(i)), np.arange(len(GP)))
+            M(lambda i: fit(GP[i], Xsph, y, self.modegroups[i], verbose=verbose, message=message+str(i)), np.arange(len(GP)))
             GP = np.array(GP)
             if pool is not None:
                 pool.close()
@@ -886,8 +886,8 @@ class Emu(object):
                 else:
                     w = np.array(result[0])
                     mse = np.array([np.sqrt(np.array(result[1]).diagonal()) for i in range(len(self.modegroups[i]))]).T
-                weights[:,self.modegroups[i]] = w
-                MSE[:,self.modegroups[i]] = mse
+                weights[:,self.modegroups[i]] = w.copy()
+                MSE[:,self.modegroups[i]] = mse.copy()
 
             if weights.ndim == 1:
                 weights = weights.reshape(1,-1)
