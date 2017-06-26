@@ -21,6 +21,9 @@ import operator
 import functools
 from sklearn import gaussian_process
 from sklearn import neighbors
+from sklearn.pipeline import Pipeline
+from sklearn import linear_model
+from sklearn.preprocessing import PolynomialFeatures
 import astropy.stats as astats
 
 try: from memory_profiler import memory_usage
@@ -83,6 +86,10 @@ class Emu(object):
 
     reg_meth : str [default='gaussian', options=('gaussian','poly')]
         regression method. Currently only 'gaussian' works
+
+    use_pca : bool [default=True]
+        if True, regress over eigenmode weights
+        if False, regress over data
     """
     def __init__(self):
         self.__name__           = 'Emu'
@@ -97,6 +104,8 @@ class Emu(object):
         self.recon_err_calib    = 1.0
         self.w_norm             = None
         self.reg_meth           = 'gaussian'
+        self.poly_deg           = 7
+        self.use_pca            = True
 
     @property
     def print_pars(self):
@@ -347,6 +356,7 @@ class Emu(object):
         Result:
         -------
         self.eig_vecs : ndarray [dtype=float, shape=(N_data, N_modes)]
+        self.eig_vals : ndarray
 
         """
         # Compute fiducial data set
@@ -401,13 +411,10 @@ class Emu(object):
         rec_var         = sum(eig_vals[:self.N_modes])
         frac_var        = rec_var/tot_var
 
-        if normalize == True and self.w_norm is None:
+        if normalize == True:
             self.w_norm = np.sqrt(eig_vals)
 
-        elif normalize == True and self.w_norm is not None:
-            self.w_norm = self.w_norm
-
-        elif normalize == False:
+        else:
             self.w_norm = np.ones(self.N_modes)
 
         w_tr /= self.w_norm
@@ -447,7 +454,7 @@ class Emu(object):
         self.w_true = np.dot(D,self.eig_vecs.T)
         self.w_tr = self.w_true / self.w_norm
 
-    def kfold_cv(self,grid_tr,data_tr,use_pca=True,predict_kwargs={},
+    def kfold_cv(self,grid_tr,data_tr,predict_kwargs={},
                    rando=None, kfold_Nclus=None, kfold_Nsamp=None, kwargs_tr={},
                    RandomState=1, pool=None, vectorize=True):
         """
@@ -458,8 +465,6 @@ class Emu(object):
         grid_tr : ndarray
 
         data_tr : ndarray
-
-        use_pca : bool (default=True)
 
         predict_kwargs : dict (default={})
 
@@ -508,7 +513,7 @@ class Emu(object):
             # Train     
             self.train(data_tr_temp,grid_tr_temp,fid_data=self.fid_data,fid_grid=self.fid_grid,**kwargs_tr)
             # Cross Valid
-            self.cross_validate(grid_tr[rando[i]], data_tr[rando[i]], use_pca=use_pca, predict_kwargs=predict_kwargs, vectorize=vectorize)
+            self.cross_validate(grid_tr[rando[i]], data_tr[rando[i]], use_pca=self.use_pca, predict_kwargs=predict_kwargs, vectorize=vectorize)
             recon_cv.extend(self.recon_cv)
             recon_err_cv.extend(self.recon_err_cv)
             recon_grid.extend(np.copy(grid_tr[rando[i]]))
@@ -527,11 +532,11 @@ class Emu(object):
 
         return recon_cv, recon_err_cv, recon_grid, recon_data, weights_cv, weights_err_cv, weights_true, rando
 
-    def cross_validate(self,grid_cv,data_cv,use_pca=True,predict_kwargs={},output=False,LAYG=False,use_tree=False,
+    def cross_validate(self,grid_cv,data_cv,predict_kwargs={},output=False,LAYG=False,use_tree=False,
                     vectorize=True,pool=None):
 
         # Solve for eigenmode weight constants
-        if use_pca == True:
+        if self.use_pca == True:
             self.klt_project(data_cv)
             self.weights_true_cv = self.w_tr * self.w_norm
 
@@ -586,8 +591,8 @@ class Emu(object):
             return self.recon_cv, self.recon_err_cv, self.recon_err_cov, self.weights_cv, self.weights_err_cv
 
     def train(self, data, grid,
-            fid_data=None, fid_grid=None, noise_var=None, gp_kwargs_arr=None, emode_variance_div=1.0,
-            use_pca=True, compute_klt=False, verbose=False, group_modes=False, invL=None,
+            fid_data=None, fid_grid=None, gp_kwargs_arr=None, emode_variance_div=1.0,
+            verbose=False, group_modes=False, invL=None, L2_alpha=1e-8,
             pool=None, norotate=False):
         """
         Train emulator surrogate models
@@ -616,10 +621,6 @@ class Emu(object):
             a list containing dictionaries of the Gaussian Process initialization kwargs
             for each invididual Gaussian Process if None, use self.gp_kwargs dictionary for all GPs
 
-        use_pca : bool [kwarg, default=True]
-            if True, use PCA to break down data into weights
-            else, don't use PCA, such that "weights" are actually data itself
-
         group_modes : bool [kwarg, default=False]
             if True, group eigenmode prediction together into "modegroups"
 
@@ -646,56 +647,51 @@ class Emu(object):
         else:
             Xsph = np.dot(invL, (grid-fid_grid).T).T
 
-        # Compute y vector
-        if compute_klt == True and use_pca == True:
-            self.klt(data,fid_data=fid_data)
-            y = self.w_tr
-
-        elif compute_klt == False and use_pca == True:
+        # Assign y vector
+        if self.use_pca == True:
+            # Check self.klt has been run
+            if hasattr(self, 'eig_vecs') == False:
+                raise Exception("Need to run self.klt() method before training when self.use_pca == True")
             self.klt_project(data)
             y = self.w_tr
 
-        elif use_pca == False:
+        elif self.use_pca == False:
             y = data
 
-        if hasattr(self,'N_modegroups') == False:
-                self.group_eigenmodes(emode_variance_div=emode_variance_div)
+        # Group y functions together for regression if desired
+        if self.use_pca == True and hasattr(self,'N_modegroups') == False:
+            self.group_eigenmodes(emode_variance_div=emode_variance_div)
+        else:
+            self.N_modegroups = len(y)
+            self.modegroups = np.arange(self.N_modegroups).reshape(-1, 1)
 
         # polynomial regression
         if self.reg_meth == 'poly':
-            # Compute design matrix
-            param_samp_ravel = map(list,Xsph.T)
-            A = self.poly_design_mat(param_samp_ravel,dim=self.N_params,degree=self.poly_deg)
+            # Set up sklearn linear regression models
+            LM = []
+            for i in range(len(y.T)):
+                poly_features   = PolynomialFeatures(self.poly_deg)
+                linear          = linear_model.Ridge(alpha=L2_alpha, fit_intercept=False)
+                model           = Pipeline([("poly", poly_features), ("linear", linear)])
+                LM.append(model)
 
-            # Use LLS over training set to solve for weight function polynomials
-            if noise_var is None:
-                noise_var = np.array([2]*self.N_samples*self.N_modes)           # all training set samples w/ equal weight
-                noise_var = noise_var.reshape(self.N_samples,self.N_modes)
+            # Fit the models
+            def fit(lm, xdata, ydata, verbose=False, message=None):
+                lm.fit(xdata, ydata)
+                if verbose == True:
+                    print(message)
 
-            # Fill weight matrix
-            W = np.zeros((self.N_modes,self.N_samples,self.N_samples))
-            for i in range(self.N_modes):
-                if noise_var is None:
-                    np.fill_diagonal(W[i],1e-5)
-                elif noise_var is not None:
-                    if type(noise_var) == float or type(noise_var) == int:
-                        np.fill_diagonal(W[i],noise_var)    
-                    else:
-                        np.fill_diagonal(W[i],noise_var[i])
+            if pool is None:
+                M = map
+            else:
+                M = pool.map
 
-            # LLS for interpolation polynomial coefficients
-            xhat = []
-            stand_err = []
-            for i in range(self.N_modes):
-                if fast == True:
-                    xh = self.chi_square_min(y.T[i],A,W[i],fast=fast)
-                    err = 0.0
-                else:
-                    xh, err = self.chi_square_min(y.T[i],A,W[i],fast=fast)
-                xhat.append(xh)
-                stand_err.append(err)
-            xhat = np.array(xhat).T
-            stand_err = np.array(stand_err).T
+            message = "...finished ydata #"
+            M(lambda i: fit(LM[i], Xsph, y.T[i], verbose=verbose, message=message+str(i)), np.arange(len(LM)) )
+            LM = np.array(LM)
+            self.LM = LM
+            if pool is not None:
+                pool.close()
 
         # Gaussian Process Regression
         elif self.reg_meth == 'gaussian':
@@ -726,13 +722,9 @@ class Emu(object):
             message = "...finished modegroup #"
             M(lambda i: fit(GP[i], Xsph, y, self.modegroups[i], verbose=verbose, message=message+str(i)), np.arange(len(GP)))
             GP = np.array(GP)
+            self.GP = GP
             if pool is not None:
                 pool.close()
-
-        # Update to namespace
-        self._trained = True
-        names = ['xhat','stand_err','GP']
-        self.update(ezcreate(names,locals()))
 
     def hypersolve_1D(self, grid_od, data_od, kernel=None, n_restarts=4, alpha=1e-3):
         """
@@ -791,7 +783,7 @@ class Emu(object):
             self.modegroups = modegroups
 
     def predict(self, grid_pred, use_Nmodes=None, fast=False, pool=None,
-        use_pca=True, sphere=True, output=False, kwargs_tr={}, LAYG=False, k=50, use_tree=True):
+        sphere=True, output=False, kwargs_tr={}, LAYG=False, k=50, use_tree=True):
         """
         Make emulator prediction(s) of training data at new points in parameter space
 
@@ -858,22 +850,17 @@ class Emu(object):
 
         # Polynomial Interpolation
         if self.reg_meth == 'poly':
-            # Calculate weights
-            if grid_pred_sph.ndim == 1: grid_pred_sph = grid_pred_sph.reshape(1,len(grid_pred_sph))
-            A = self.poly_design_mat(grid_pred_sph.T,dim=self.N_params,degree=self.poly_deg)
-            weights = np.dot(A,self.xhat)
+            # iterate over linear models
+            weights, MSE = [], []
+            for i in range(len(self.LM)):
+                result = self.LM[i].predict(grid_pred_sph)
+                w = np.array(result)
+                mse = np.zeros_like(w)
+                weights.append(w)
+                MSE.append(mse)
+            weights = np.array(weights)
+            MSE = np.array(MSE)
 
-            # Renormalize weights
-            weights *= self.w_norm
-
-            # Compute construction
-            if use_pca == True:
-                recon = np.dot(weights.T[:use_Nmodes].T,self.eig_vecs[:use_Nmodes])
-            else:
-                recon = weights.T[0]
-
-            weights_err = self.stand_err.reshape(weights.shape) * self.w_norm
- 
         # Gaussian Process Interpolation
         if self.reg_meth == 'gaussian':
             # Iterate over GPs
@@ -897,11 +884,11 @@ class Emu(object):
             weights *= self.w_norm
             weights_err = np.sqrt(MSE) * np.sqrt(self.w_norm)
 
-            # Compute reconstruction
-            if use_pca == True:
-                recon = np.dot(weights.T[:use_Nmodes].T,self.eig_vecs[:use_Nmodes])
-            else:
-                recon = weights
+        # Compute reconstruction
+        if self.use_pca == True:
+            recon = np.dot(weights.T[:use_Nmodes].T,self.eig_vecs[:use_Nmodes])
+        else:
+            recon = weights
 
         # Un-scale the data
         if self.cov_whiten == True:
@@ -922,7 +909,7 @@ class Emu(object):
             recon_err_cov = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
 
         else:
-            if use_pca == True:
+            if self.use_pca == True:
                 emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
                 if self.cov_rescale == True:
                     emode_err *= self.rescale
