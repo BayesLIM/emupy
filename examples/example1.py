@@ -45,6 +45,7 @@ E.N_samples = 200   # training set samples
 E.N_params = 3     # dimensional parameter space
 E.lognorm = True    # log normalize data
 E.cov_whiten = True
+E.use_pca = True
 
 # Calculate fiducial data
 fid_data = np.array(map(np.median, data_tr.T))

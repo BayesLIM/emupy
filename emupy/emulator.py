@@ -592,8 +592,7 @@ class Emu(object):
 
     def train(self, data, grid,
             fid_data=None, fid_grid=None, gp_kwargs_arr=None, emode_variance_div=1.0,
-            verbose=False, group_modes=False, invL=None, L2_alpha=1e-8,
-            pool=None, norotate=False):
+            verbose=False, group_modes=False, L2_alpha=1e-8, pool=None, norotate=False):
         """
         Train emulator surrogate models
 
@@ -614,9 +613,6 @@ class Emu(object):
         compute_klt : bool [kwarg, default=False]
             if True, recompute KLT with "data" ndarray as input
       
-        invL : ndarray [kwarg, default=None]
-            inverse Cholesky to use in sphering of "grid" matrix
-
         gp_kwargs_arr : list [kwarg, default=None]
             a list containing dictionaries of the Gaussian Process initialization kwargs
             for each invididual Gaussian Process if None, use self.gp_kwargs dictionary for all GPs
@@ -641,11 +637,11 @@ class Emu(object):
             a list containing the trained surrogate models of length self.N_modegroups
         """
         # Sphere parameter space vector
-        if invL is None:
+        if hasattr(self, 'invL') == False:
             self.sphere(grid,fid_grid=fid_grid,norotate=norotate)
             Xsph = self.Xsph
         else:
-            Xsph = np.dot(invL, (grid-fid_grid).T).T
+            Xsph = np.dot(self.invL, (grid-fid_grid).T).T
 
         # Assign y vector
         if self.use_pca == True:
