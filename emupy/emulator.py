@@ -662,14 +662,14 @@ class Emu(object):
         if self.use_pca == True and hasattr(self,'N_modegroups') == False:
             self.group_eigenmodes(emode_variance_div=emode_variance_div)
         else:
-            self.N_modegroups = len(y)
+            self.N_modegroups = len(y.T)
             self.modegroups = np.arange(self.N_modegroups).reshape(-1, 1)
 
         # polynomial regression
         if self.reg_meth == 'poly':
             # Set up sklearn linear regression models
             LM = []
-            for i in range(len(y.T)):
+            for i in range(self.N_modegroups):
                 poly_features   = PolynomialFeatures(self.poly_deg)
                 linear          = linear_model.Ridge(alpha=L2_alpha, fit_intercept=False)
                 model           = Pipeline([("poly", poly_features), ("linear", linear)])
@@ -851,15 +851,15 @@ class Emu(object):
         # Polynomial Interpolation
         if self.reg_meth == 'poly':
             # iterate over linear models
-            weights, MSE = [], []
+            weights, weights_err = [], []
             for i in range(len(self.LM)):
                 result = self.LM[i].predict(grid_pred_sph)
                 w = np.array(result)
                 mse = np.zeros_like(w)
                 weights.append(w)
-                MSE.append(mse)
-            weights = np.array(weights)
-            MSE = np.array(MSE)
+                weights_err.append(mse)
+            weights = np.array(weights).T
+            weights_err = np.array(weights_err).T
 
         # Gaussian Process Interpolation
         if self.reg_meth == 'gaussian':
@@ -905,8 +905,12 @@ class Emu(object):
 
         # Calculate Error
         if fast == True:
-            recon_err = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1]))
-            recon_err_cov = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
+            if use_pca == True:
+                recon_err = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1]))
+                recon_err_cov = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
+            else:
+                recon_err = np.zeros((len(grid_pred_sph), recon.shape[1]))
+                recon_err_cov = np.zeros((len(grid_pred_sph), recon.shape[1], recon.shape[1]))
 
         else:
             if self.use_pca == True:
@@ -920,7 +924,7 @@ class Emu(object):
 
             else:
                 recon_err = weights_err
-                recon_err_cov = np.array([np.eye(len(recon.T[i]),len(recon.T[i])) * recon_err.T[i] for i in range(len(recon.T))]).T
+                recon_err_cov = np.array([np.eye(len(recon[i]),len(recon[i])) * recon_err[i] for i in range(len(recon))])
 
             # ReNormalize Error
             if self.lognorm == True:
