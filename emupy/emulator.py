@@ -60,12 +60,12 @@ class Emu(object):
     lognorm : bool [default=False]
         if True, log-transform training data before emulation
 
-    cov_whiten : bool [default=False]
-        if True, scale training data by standard deviation
-        before emulation to whiten its covariance matrix
+    data_whiten : bool [default=False]
+        if True, scale training data y-values by standard deviation
+        before emulation to whiten it
 
-    cov_rescale : bool [default=False]
-        if True, scale training data by rescaling matrix (default is
+    data_rescale : bool [default=False]
+        if True, scale training data y-values by rescaling matrix (default is
         observational errors if True) before emulation
 
     rescale : ndarray [default=None]
@@ -96,8 +96,8 @@ class Emu(object):
         self._trained           = False
         self.cov_est            = np.cov
         self.lognorm            = False
-        self.cov_whiten         = False
-        self.cov_rescale        = False
+        self.data_whiten         = False
+        self.data_rescale        = False
         self.rescale            = None
         self.rescale_power      = None
         self.recon_calib        = 1.0
@@ -328,6 +328,72 @@ class Emu(object):
             sq_err = np.abs(np.dot(resid.T,resid)/(Ashape[0]-Ashape[1]))
             return xhat, np.sqrt(sq_err)
 
+    def scale_data(self, data_tr, fid_data=None):
+        """
+        Prepare training data y-values for either KLT if use_pca == True
+        or for direct fitting if use_pca == False
+
+        Input:
+        ------
+        data_tr : ndarray [arg, dtype=float, shape=(N_samples, N_data)]
+            ndarray containing training data of training set
+
+        fid_data : ndarray [kwarg, dtype=float, default=None]
+            1D array containing data vector of average (or fiducial) data set
+            if None, calculated w/ median
+
+        Optional:
+        ---------
+        self.lognorm : bool [default=False]
+            see class doc-string
+
+        self.data_whiten : bool [default=False]
+            see class doc-string
+
+        self.data_rescale : bool [default=False]
+            see class doc-string
+
+        self.rescale_power : bool [default=False]
+            see class doc-string
+
+        self.rescale : ndarray  [default=None]
+            see class doc-string
+
+        Result:
+        -------
+        self.D : ndarray [shape=(N_sample, N_data)]
+            training data y-values that have been centered and (possibly) rescaled
+
+        self.Dstd : ndarray [shape=(N_data,)]
+            if self.cov_whiten == True, standard deviation of training data y-values
+        """
+        # Compute fiducial data set
+        if fid_data is None:
+            if self.lognorm == True:
+                fid_data = np.exp(np.array(map(astats.biweight_location, np.log(data_tr.T))))
+            else:
+                fid_data = np.array(map(astats.biweight_location, data_tr.T))
+
+        # Find self-variance of mean-subtracted data
+        if self.lognorm == True:
+            self.D = np.log(data_tr / fid_data)
+        else:
+            self.D = (data_tr - fid_data)
+
+        if self.data_whiten == True:
+            self.Dstd = np.array(map(astats.biweight_midvariance,self.D.T))
+            self.D /= self.Dstd
+
+        if self.data_rescale == True:
+            if self.rescale is not None:
+                if self.lognorm == True:
+                    self.rescale = self.yerrs / fid_data
+                else:
+                    self.rescale = self.yerrs
+            if self.rescale_power is not None:
+                self.rescale = self.rescale**self.rescale_power
+            self.D /= self.rescale
+
     def klt(self, data_tr, fid_data=None, normalize=False):
         """
         Perform eigenvector decomposition, aka "Karhunen Loeve Transform" (KLT)
@@ -339,6 +405,7 @@ class Emu(object):
 
         fid_data : ndarray [kwarg, dtype=float, default=None]
             1D array containing data vector of average (or fiducial) data set
+            if None, calculated w/ median
 
         normalize : bool [kwarg, default=False]
             if True, normalize PCA weights to have variance of unity
@@ -352,42 +419,27 @@ class Emu(object):
             Normalization vector for PCA weights
             if None and normalize == True, taken to be sqrt of eigenvalues
 
-
         Result:
         -------
+        self.Dcov : ndarray [dtype=float, shape=(N_data, N_data)]
+            covariance matrix of self.D data set
+
+        self.w_tr : ndarray [dtype=float, shape=(N_sample, N_modes)]
+            matrix containing training data in PCA-reduced basis
+
         self.eig_vecs : ndarray [dtype=float, shape=(N_data, N_modes)]
-        self.eig_vals : ndarray
+            matrix containing eigenvectors after truncation
+
+        self.eig_vals : ndarray [dtype=float, shape=(N_modes,)]
+            vector containing eigenvalues after truncation
 
         """
-        # Compute fiducial data set
-        if fid_data is None:
-            if self.lognorm == True:
-                fid_data = np.exp(np.array(map(astats.biweight_location, np.log(data_tr.T))))
-            else:
-                fid_data = np.array(map(astats.biweight_location, data_tr.T))
 
-        # Find self-variance of mean-subtracted data
-        if self.lognorm == True:
-            D = np.log(data_tr / fid_data)
-        else:
-            D = (data_tr - fid_data)
-
-        if self.cov_whiten == True:
-            self.Dstd = np.array(map(astats.biweight_midvariance,D.T))
-            D /= self.Dstd
-
-        if self.cov_rescale == True:
-            if self.rescale is not None:
-                if self.lognorm == True:
-                    self.rescale = self.yerrs/fid_data
-                else:
-                    self.rescale = self.yerrs
-            if self.rescale_power is not None:
-                self.rescale = self.rescale**self.rescale_power
-            D /= self.rescale
+        # center and scale data
+        self.scale_data(data_tr, fid_data=fid_data)
 
         # Find Covariance
-        Dcov = self.cov_est(D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
+        Dcov = self.cov_est(self.D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
 
         # Solve for eigenvectors and values using SVD
         u,eig_vals,eig_vecs = la.svd(Dcov)
@@ -398,7 +450,7 @@ class Emu(object):
         eig_vecs = eig_vecs[eigen_sort]
 
         # Solve for per-sample eigenmode weight constants
-        w_tr = np.dot(D,eig_vecs.T)
+        w_tr = np.dot(self.D,eig_vecs.T)
 
         # Truncate eigenmodes to N_modes # of modes
         if hasattr(self, 'N_modes') == False:
@@ -413,7 +465,6 @@ class Emu(object):
 
         if normalize == True:
             self.w_norm = np.sqrt(eig_vals)
-
         else:
             self.w_norm = np.ones(self.N_modes)
 
@@ -433,25 +484,22 @@ class Emu(object):
         data : ndarray [arg, dtype=float, shape=(N_samples, N_data)]
             ndarray of data
 
-        Output:
+        Result:
         -------
+        self.w_true : ndarray
+            "true weights" of data projected onto self.eig_vecs
+
         self.w_tr : ndarray
-            "true weights" of data projected onto self.eigenmodes (after weight normalization)
+            "training weights" of data projected onto self.eig_vecs after weight normalization
+
+        self.D : ndarray
+            centered and rescaled training data
         """
-        # Subtract fiducial data from data
-        if self.lognorm == True:
-            D = np.log(data / self.fid_data)
-        else:
-            D = data - self.fid_data
-
-        if self.cov_whiten == True:
-            D /= self.Dstd
-
-        if self.rescale == True:
-            D /= self.rescale
+        # Subtract fiducial data from data and rescale
+        self.scale_data(data, fid_data=self.fid_data)
 
         # Project onto eigenvectors
-        self.w_true = np.dot(D,self.eig_vecs.T)
+        self.w_true = np.dot(self.D,self.eig_vecs.T)
         self.w_tr = self.w_true / self.w_norm
 
     def kfold_cv(self,grid_tr,data_tr,predict_kwargs={},
@@ -591,7 +639,7 @@ class Emu(object):
             return self.recon_cv, self.recon_err_cv, self.recon_err_cov, self.weights_cv, self.weights_err_cv
 
     def train(self, data, grid,
-            fid_data=None, fid_grid=None, gp_kwargs_arr=None, emode_variance_div=1.0,
+            gp_kwargs_arr=None, emode_variance_div=1.0,
             verbose=False, group_modes=False, L2_alpha=1e-8, pool=None, norotate=False):
         """
         Train emulator surrogate models
@@ -604,15 +652,6 @@ class Emu(object):
         grid : ndarray [arg, dtype=float, shape=(N_samples, N_dim)]
             ndarray of training set parameter vectors
 
-        fid_data : ndarray [kwarg, dtype=float, shape=(N_data,)]
-            1Darray of fiducial or average data vector of training data
-
-        fid_grid : ndarray [kwarg, dtype=float, shape=(N_dim,)]
-            1Darray of fiducial parameter vector
-
-        compute_klt : bool [kwarg, default=False]
-            if True, recompute KLT with "data" ndarray as input
-      
         gp_kwargs_arr : list [kwarg, default=None]
             a list containing dictionaries of the Gaussian Process initialization kwargs
             for each invididual Gaussian Process if None, use self.gp_kwargs dictionary for all GPs
@@ -631,17 +670,37 @@ class Emu(object):
         pool : pool object [kwarg, default=None]
             pool object used for multiprocessing of training
 
+        Optional:
+        ---------
+        self.fid_grid : ndarray [kwarg, dtype=float, shape=(N_data,)]
+            1D vector of average grid positions in parameter space, averaged across training samples
+
+        self.fid_data : ndarray [kwarg, dtype=float, shape=(N_dim,)]
+            1D vector of average data, averaged across training samples
+
         Result:
         -------
         self.GP : list
             a list containing the trained surrogate models of length self.N_modegroups
+            if self.reg_meth == 'gaussian'
+
+        self.LM : list
+            a list of linear models containing polynomial fits of length self.N_modegroups
+            if self.reg_meth == 'poly'
+
         """
+        # Check fid_grid and fid_data
+        if hasattr(self, 'fid_grid') == False:
+            self.fid_grid = np.median(grid, axis=0)
+        if hasattr(self, 'fid_data') == False:
+            self.fid_data = np.median(data, axis=0)
+
         # Sphere parameter space vector
         if hasattr(self, 'invL') == False:
-            self.sphere(grid,fid_grid=fid_grid,norotate=norotate)
+            self.sphere(grid,fid_grid=self.fid_grid,norotate=norotate)
             Xsph = self.Xsph
         else:
-            Xsph = np.dot(self.invL, (grid-fid_grid).T).T
+            Xsph = np.dot(self.invL, (grid-self.fid_grid).T).T
 
         # Assign y vector
         if self.use_pca == True:
@@ -652,7 +711,8 @@ class Emu(object):
             y = self.w_tr
 
         elif self.use_pca == False:
-            y = data
+            self.scale_data(data)
+            y = self.D
 
         # Group y functions together for regression if desired
         if self.use_pca == True and hasattr(self,'N_modegroups') == False:
@@ -673,8 +733,8 @@ class Emu(object):
                 LM.append(model)
 
             # Fit the models
-            def fit(lm, xdata, ydata, verbose=False, message=None):
-                lm.fit(xdata, ydata)
+            def fit(lm, xdata, ydata, modegroups, verbose=False, message=None):
+                lm.fit(xdata, ydata.T[modegroups].T)
                 if verbose == True:
                     print(message)
 
@@ -684,7 +744,7 @@ class Emu(object):
                 M = pool.map
 
             message = "...finished ydata #"
-            M(lambda i: fit(LM[i], Xsph, y.T[i], verbose=verbose, message=message+str(i)), np.arange(len(LM)) )
+            M(lambda i: fit(LM[i], Xsph, y, self.modegroups[i],  verbose=verbose, message=message+str(i)), np.arange(len(LM)) )
             LM = np.array(LM)
             self.LM = LM
             if pool is not None:
@@ -848,20 +908,18 @@ class Emu(object):
         # Polynomial Interpolation
         if self.reg_meth == 'poly':
             # iterate over linear models
-            weights, weights_err = [], []
+            weights, weights_err = np.zeros((len(grid_pred_sph), self.N_modes)), np.zeros((len(grid_pred_sph), self.N_modes))
             for i in range(len(self.LM)):
                 result = self.LM[i].predict(grid_pred_sph)
                 w = np.array(result)
                 mse = np.zeros_like(w)
-                weights.append(w)
-                weights_err.append(mse)
-            weights = np.array(weights).T
-            weights_err = np.array(weights_err).T
+                weights[:,self.modegroups[i]] = w.copy()
+                weights_err[:,self.modegroups[i]] = mse.copy()
 
         # Gaussian Process Interpolation
         if self.reg_meth == 'gaussian':
             # Iterate over GPs
-            weights, MSE = np.zeros((len(grid_pred_sph), self.N_modes)), np.zeros((len(grid_pred_sph), self.N_modes))
+            weights, weights_err = np.zeros((len(grid_pred_sph), self.N_modes)), np.zeros((len(grid_pred_sph), self.N_modes))
             for i in range(len(self.GP)):
                 result = self.GP[i].predict(grid_pred_sph, return_cov=(fast==False))
                 if fast == True:
@@ -871,15 +929,16 @@ class Emu(object):
                     w = np.array(result[0])
                     mse = np.array([np.sqrt(np.array(result[1]).diagonal()) for j in range(len(self.modegroups[i]))]).T
                 weights[:,self.modegroups[i]] = w.copy()
-                MSE[:,self.modegroups[i]] = mse.copy()
+                weights_err[:,self.modegroups[i]] = mse.copy()
 
             if weights.ndim == 1:
                 weights = weights.reshape(1,-1)
-                MSE = MSE.reshape(1,-1)
+                weights_err = np.sqrt(weights_err.reshape(1,-1))
 
             # Renormalize weights
-            weights *= self.w_norm
-            weights_err = np.sqrt(MSE) * np.sqrt(self.w_norm)
+            if self.use_pca == True:
+                weights *= self.w_norm
+                weights_err = weights_err * np.sqrt(self.w_norm)
 
         # Compute reconstruction
         if self.use_pca == True:
@@ -888,10 +947,10 @@ class Emu(object):
             recon = weights
 
         # Un-scale the data
-        if self.cov_whiten == True:
+        if self.data_whiten == True:
             recon *= self.Dstd
 
-        if self.cov_rescale == True:
+        if self.data_rescale == True:
             recon *= self.rescale
 
         # Un-log and un-center the data
@@ -912,9 +971,9 @@ class Emu(object):
         else:
             if self.use_pca == True:
                 emode_err = np.array(map(lambda x: (x*self.eig_vecs.T).T, weights_err))
-                if self.cov_rescale == True:
+                if self.data_rescale == True:
                     emode_err *= self.rescale
-                if self.cov_whiten == True:
+                if self.data_whiten == True:
                     emode_err *= self.Dstd
                 recon_err = np.sqrt( np.array(map(lambda x: np.sum(x,axis=0),emode_err**2)) )
                 recon_err_cov = np.sum([[np.outer(emode_err[i,j], emode_err[i,j]) for j in range(self.N_modes)] for i in range(len(recon))], axis=1)
