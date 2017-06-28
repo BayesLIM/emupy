@@ -39,7 +39,7 @@ grid_cv = grid[~select]
 
 # Initialize Emulator and variables
 E = emupy.Emu()
-E.N_modes = 15       # Save 10 out of 91 eigenmodes
+E.N_modes = 5       # Save 10 out of 91 eigenmodes
 E.N_data = 78       # data elements
 E.N_samples = 200   # training set samples 
 E.N_params = 3     # dimensional parameter space
@@ -65,7 +65,7 @@ gp_kwargs = {'kernel':kernel, 'n_restarts_optimizer':n_restarts_optimizer, 'opti
 E.gp_kwargs = gp_kwargs
 
 # Train Emulator
-E.train(data_tr, grid_tr, fid_data=fid_data, fid_grid=fid_grid, verbose=True, invL=E.invL)
+E.train(data_tr, grid_tr, fid_data=fid_data, fid_grid=fid_grid, verbose=True)
 
 # Cross Validate
 E.predict(grid_cv)

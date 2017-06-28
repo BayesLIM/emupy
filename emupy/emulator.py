@@ -659,6 +659,7 @@ class Emu(object):
             self.group_eigenmodes(emode_variance_div=emode_variance_div)
         else:
             self.N_modegroups = len(y.T)
+            self.N_modes = self.N_modegroups
             self.modegroups = np.arange(self.N_modegroups).reshape(-1, 1)
 
         # polynomial regression
