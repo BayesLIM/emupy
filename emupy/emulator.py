@@ -333,6 +333,9 @@ class Emu(object):
         Prepare training data y-values for either KLT if use_pca == True
         or for direct fitting if use_pca == False
 
+        Performs a centering (w/ fid_data) and optionally
+        performs a rescaling of the y-values
+
         Input:
         ------
         data_tr : ndarray [arg, dtype=float, shape=(N_samples, N_data)]
@@ -711,7 +714,7 @@ class Emu(object):
             y = self.w_tr
 
         elif self.use_pca == False:
-            self.scale_data(data)
+            self.scale_data(data, fid_data=self.fid_data)
             y = self.D
 
         # Group y functions together for regression if desired
