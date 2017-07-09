@@ -27,4 +27,6 @@ See Examples for demonstrations of how to run the code
 Please use [Kern et al. 2017](https://arxiv.org/abs/1705.04688) for citation.
 
 ### Authors:
-Nicholas Kern
+Nicholas Kern, UC Berkeley
+<br>
+Duncan Rocha, Harvey Mudd College
