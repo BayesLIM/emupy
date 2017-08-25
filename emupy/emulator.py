@@ -594,6 +594,8 @@ class Emu(object):
         if self.use_pca == True:
             self.klt_project(data_cv)
             self.weights_true_cv = self.w_true
+        else:
+            self.weights_true_cv = np.zeros_like(data_cv)
 
         # Set-up iterator
         if pool is None:
