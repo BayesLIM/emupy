@@ -401,7 +401,7 @@ class Emu(object):
                 self.rescale = self.rescale**self.rescale_power
             self.D /= self.rescale
 
-    def klt(self, data_tr, fid_data=None, normalize=False):
+    def klt(self, data_tr, normalize=True):
         """
         Perform eigenvector decomposition, aka "Karhunen Loeve Transform" (KLT)
 
@@ -443,7 +443,7 @@ class Emu(object):
         """
 
         # center and scale data
-        self.scale_data(data_tr, fid_data=fid_data)
+        self.scale_data(data_tr, fid_data=self.fid_data)
 
         # Find Covariance
         Dcov = self.cov_est(self.D.T) #np.cov(D.T, ddof=1) #np.inner(D.T,D.T)/self.N_samples
@@ -463,11 +463,11 @@ class Emu(object):
         if hasattr(self, 'N_modes') == False:
             self.N_modes = len(eig_vals)
 
+        tot_var         = sum(eig_vals)
         eig_vals        = eig_vals[:self.N_modes]
         eig_vecs        = eig_vecs[:self.N_modes]
         w_tr            = w_tr[:,:self.N_modes]
-        tot_var         = sum(eig_vals)
-        rec_var         = sum(eig_vals[:self.N_modes])
+        rec_var         = sum(eig_vals)
         frac_var        = rec_var/tot_var
 
         if normalize == True:
