@@ -372,10 +372,14 @@ class Emu(object):
         """
         # Compute fiducial data set
         if fid_data is None:
-            if self.lognorm == True:
-                fid_data = np.exp(np.array(map(astats.biweight_location, np.log(data_tr.T))))
-            else:
-                fid_data = np.array(map(astats.biweight_location, data_tr.T))
+            try:
+                fid_data = self.fid_data
+            except:
+                if self.lognorm == True:
+                    fid_data = np.exp(np.array(map(astats.biweight_location, np.log(data_tr.T))))
+                else:
+                    fid_data = np.array(map(astats.biweight_location, data_tr.T))
+                self.fid_data = fid_data
 
         # Find self-variance of mean-subtracted data
         if self.lognorm == True:
@@ -589,7 +593,7 @@ class Emu(object):
         # Solve for eigenmode weight constants
         if self.use_pca == True:
             self.klt_project(data_cv)
-            self.weights_true_cv = self.w_tr * self.w_norm
+            self.weights_true_cv = self.w_true
 
         # Set-up iterator
         if pool is None:
@@ -941,7 +945,7 @@ class Emu(object):
             # Renormalize weights
             if self.use_pca == True:
                 weights *= self.w_norm
-                weights_err = weights_err * np.sqrt(self.w_norm)
+                weights_err *= np.sqrt(self.w_norm)
 
         # Compute reconstruction
         if self.use_pca == True:
