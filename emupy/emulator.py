@@ -704,7 +704,7 @@ class Emu(object):
 
         # Sphere parameter space vector
         if hasattr(self, 'invL') == False:
-            self.sphere(grid,fid_grid=self.fid_grid,norotate=norotate)
+            self.sphere(grid, fid_grid=self.fid_grid, save_chol=True, norotate=norotate)
             Xsph = self.Xsph
         else:
             Xsph = np.dot(self.invL, (grid-self.fid_grid).T).T
