@@ -457,7 +457,7 @@ class Emu(object):
         eig_vecs = eig_vecs[eigen_sort]
 
         # Solve for per-sample eigenmode weight constants
-        w_tr = np.dot(self.D,eig_vecs.T)
+        w_true = np.dot(self.D, eig_vecs.T)
 
         # Truncate eigenmodes to N_modes # of modes
         if hasattr(self, 'N_modes') == False:
@@ -466,7 +466,7 @@ class Emu(object):
         tot_var         = sum(eig_vals)
         eig_vals        = eig_vals[:self.N_modes]
         eig_vecs        = eig_vecs[:self.N_modes]
-        w_tr            = w_tr[:,:self.N_modes]
+        w_true          = w_true[:,:self.N_modes]
         rec_var         = sum(eig_vals)
         frac_var        = rec_var/tot_var
 
@@ -475,10 +475,10 @@ class Emu(object):
         else:
             self.w_norm = np.ones(self.N_modes)
 
-        w_tr /= self.w_norm
+        w_tr = w_true / self.w_norm
 
         # Update to Namespace
-        names = ['D','data_tr','Dcov','eig_vals','eig_vecs','w_tr','tot_var','rec_var','frac_var','fid_data']
+        names = ['D','data_tr','Dcov','eig_vals','eig_vecs','w_tr','w_true','tot_var','rec_var','frac_var','fid_data']
         self.update(ezcreate(names,locals()))
 
     def klt_project(self, data):
@@ -506,7 +506,7 @@ class Emu(object):
         self.scale_data(data, fid_data=self.fid_data)
 
         # Project onto eigenvectors
-        self.w_true = np.dot(self.D,self.eig_vecs.T)
+        self.w_true = np.dot(self.D, self.eig_vecs.T)
         self.w_tr = self.w_true / self.w_norm
 
     def kfold_cv(self,grid_tr,data_tr,predict_kwargs={},
@@ -953,7 +953,7 @@ class Emu(object):
         if self.use_pca == True:
             recon = np.dot(weights.T[:use_Nmodes].T,self.eig_vecs[:use_Nmodes])
         else:
-            recon = weights
+            recon = weights.copy()
 
         # Un-scale the data
         if self.data_whiten == True:
@@ -1003,16 +1003,12 @@ class Emu(object):
         recon_err *= self.recon_err_calib
         recon_err_cov *= self.recon_err_calib**2
 
-        # Construct data product and error on data product
-        if fast == False:
-            names = ['recon','weights','MSE','weights_err','grid_pred_sph','recon_err','recon_err_cov']
-            self.update(ezcreate(names,locals()))
-        else:
-            self.recon = recon
-            self.recon_err = recon_err
-            self.weights = weights
-            self.weights_err = weights_err
-            self.recon_err_cov = recon_err_cov
+        # Attach to class
+        self.recon = recon
+        self.recon_err = recon_err
+        self.weights = weights
+        self.weights_err = weights_err
+        self.recon_err_cov = recon_err_cov
 
         if output == True:
             return recon, recon_err, recon_err_cov, weights, weights_err
