@@ -388,7 +388,7 @@ class Emu(object):
             self.D = (data_tr - fid_data)
 
         if self.data_whiten == True:
-            self.Dstd = np.array(map(astats.biweight_midvariance,self.D.T))
+            self.Dstd = np.array(map(astats.biweight_midvariance,self.D.T))**(1./2)
             self.D /= self.Dstd
 
         if self.data_rescale == True:
