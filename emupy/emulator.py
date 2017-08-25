@@ -944,10 +944,10 @@ class Emu(object):
                 weights = weights.reshape(1,-1)
                 weights_err = np.sqrt(weights_err.reshape(1,-1))
 
-            # Renormalize weights
-            if self.use_pca == True:
-                weights *= self.w_norm
-                weights_err *= np.sqrt(self.w_norm)
+        # Renormalize weights
+        if self.use_pca == True:
+            weights *= self.w_norm
+            weights_err *= np.sqrt(self.w_norm)
 
         # Compute reconstruction
         if self.use_pca == True:
