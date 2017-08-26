@@ -328,7 +328,7 @@ class Emu(object):
             sq_err = np.abs(np.dot(resid.T,resid)/(Ashape[0]-Ashape[1]))
             return xhat, np.sqrt(sq_err)
 
-    def scale_data(self, data_tr, fid_data=None):
+    def scale_data(self, data_tr, fid_data=None, overwrite_std=False):
         """
         Prepare training data y-values for either KLT if use_pca == True
         or for direct fitting if use_pca == False
@@ -344,6 +344,9 @@ class Emu(object):
         fid_data : ndarray [kwarg, dtype=float, default=None]
             1D array containing data vector of average (or fiducial) data set
             if None, calculated w/ median
+
+        overwrite_std : bool [default=False]
+            even if self.Dstd exists, create a new one based on this D matrix
 
         Optional:
         ---------
@@ -388,8 +391,13 @@ class Emu(object):
             self.D = (data_tr - fid_data)
 
         if self.data_whiten == True:
-            self.Dstd = np.array(map(astats.biweight_midvariance,self.D.T))**(1./2)
-            self.D /= self.Dstd
+            if overwrite_std == True:
+                self.Dstd = np.array(map(astats.biweight_midvariance,self.D.T))**(1./2)
+            try:
+                self.D /= self.Dstd
+            except:
+                self.Dstd = np.array(map(astats.biweight_midvariance,self.D.T))**(1./2)
+                self.D /= self.Dstd
 
         if self.data_rescale == True:
             if self.rescale is not None:
