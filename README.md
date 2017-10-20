@@ -6,7 +6,7 @@ Code Repo : https://github.com/nkern/emupy
 ### About:
 **emupy** is a generalized Python implementation of the emulator algorithm detailed in [Kern et al. 2017](https://arxiv.org/abs/1705.04688),
 and includes methods for Principcal Component Analysis (PCA) and Gaussian Process Regression. It is currently
-only compatible with Python 2.7
+only compatible with Python 2.7. To see emupy applied specifically to emulating the 21cm EoR power spectrum, see [pycape](https://github.com/nkern/pycape).
 
 ### Dependencies:
 - numpy >= 1.10.4
