@@ -13,7 +13,8 @@ from __future__ import division
 import os
 import sys
 import numpy as np
-import scipy.linalg as la
+#import scipy.linalg as la
+import numpy.linalg as la
 import fnmatch
 from .scripts.DictEZ import create as ezcreate
 import itertools
@@ -978,7 +979,7 @@ class Emu(object):
 
         # Calculate Error
         if fast == True:
-            if use_pca == True:
+            if self.use_pca == True:
                 recon_err = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1]))
                 recon_err_cov = np.zeros((len(grid_pred_sph), self.eig_vecs.shape[1], self.eig_vecs.shape[1]))
             else:
