@@ -401,7 +401,7 @@ class Emu(object):
                 self.D /= self.Dstd
 
         if self.data_rescale == True:
-            if self.rescale is not None:
+            if self.rescale is None:
                 if self.lognorm == True:
                     self.rescale = self.yerrs / fid_data
                 else:
