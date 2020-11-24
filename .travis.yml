@@ -1,10 +1,6 @@
-# Set Language
 language: python
 python:
     - 3.6
-notifications:
-    email: false
-
 # Setup anaconda
 install:
     - wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
@@ -20,11 +16,17 @@ install:
     - conda create -q -n test-env python=$TRAVIS_PYTHON_VERSION scikit-learn numpy scipy matplotlib astropy
     - source activate test-env
     - export PYTHONPATH=$HOME/miniconda/envs/test-env/lib/python2.7/site-packages:$PYTHONPATH
-    - python setup.py install
+    - pip install -e .
 
     # Install rest of pip deps
     - pip install -r requirements.txt
 
-# Test
-script: pytest
+before_script:
+    - "export MPLBACKEND=agg"
 
+# Test
+script:
+  - python -m pytest --cov emupy
+
+after_success:
+  - coveralls

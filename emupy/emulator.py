@@ -4,6 +4,7 @@ Base Emulator class
 
 import numpy as np
 from numpy import linalg
+from sklearn import neighbors
 
 
 class Emulator:
@@ -124,7 +125,7 @@ class Emulator:
         elif tree_type == 'kd':
             self.tree = neighbors.KDTree(X, leaf_size=leaf_size, metric=metric)
 
-    def nearest_X(self, x, k=10, use_tree=False, use_sph=False):
+    def nearest_X(self, x, k=10, use_tree=False, X=None):
         """
         Perform a nearest neighbor search of self.X from x
 
@@ -137,10 +138,10 @@ class Emulator:
             Number of nearest neighbors to query
 
         use_tree : bool
-            if True, use tree structure to make query, else use brute-force search
-
-        use_sph : bool
-            If True, query self.Xsph instead of self.X (only for brute-force)
+            If True, use tree structure to make query, else use brute-force search
+    
+        X : array_like, (Nsamples, Nfeatures)
+            If tree is not being used, this is the training data to brute-force search 
 
         Returns
         -------
@@ -150,37 +151,27 @@ class Emulator:
         array_like
             indices of k nearest neighbors in self.X
         """
+        x = np.atleast_2d(x)
         if use_tree:
             assert hasattr(self, 'tree'), "Must first intantiate tree"
             x_dist, x_NN = self.tree.query(x, k=k+1)
-            if x.ndim == 1:
-                x_dist, x_NN = x_dist[0], x_NN[0]
-
         else:
-            if use_sph:
-                assert hasattr(self, 'Xsph'), "First use sphere() for use_sph"
-                X = self.Xsph
-            else:
-                X = self.X
-            if x.ndim == 1:
-                x = [x]
-
             # brute-force search
-            dist = np.array([linalg.norm(X - _x) for _x in x])
+            dist = np.array([linalg.norm(X - _x, axis=-1) for _x in x])
             nearest = np.array([np.argsort(d) for d in dist])
             x_NN = np.array([n[:k+1] for n in nearest])
-            x_dist = np.array([dist[n] for n in x_NN])
+            x_dist = np.array([dist[i, n] for i, n in enumerate(x_NN)])
 
-        if np.isclose(x_dist[0], 0):
-            x_dist = x_dist[1:]
-            x_NN = x_NN[1:]
+        if np.isclose(x_dist[:, 0], 0):
+            x_dist = x_dist[:, 1:]
+            x_NN = x_NN[:, 1:]
         else:
-            x_dist = x_dist[:-1]
-            x_NN = x_NN[:-1]
+            x_dist = x_dist[:, :-1]
+            x_NN = x_NN[:, :-1]
 
         return x_dist, x_NN
 
-    def scale_data(self, y, center=True, whiten=True, y_center=None, y_scaled_std=None, lognorm=False, save_scaling=False):
+    def scale_data(self, y, center=True, whiten=True, y_center=None, y_scaled_std=None, lognorm=False, save=False):
         """
         Performs a centering and (optional) rescaling of the
         training data targets.
@@ -208,36 +199,33 @@ class Emulator:
         lognorm : bool
             If True, cast y into log space before center and scaling
 
-        save_scaling : bool
+        save : bool
             If True, save y_center and y_scaled_std to self
         """
-        # Compute center
-        if center:
-            if y_center is None:
-                if lognorm:
-                    y_center = np.exp(np.median(np.log(y), axis=0))
-                else:
-                    y_center = np.median(y, axis=0)
-
-        # Center data
+        # lognorm and center
+        self.centered = center
+        self.lognorm = lognorm
         if lognorm:
+            if center:
+                if y_center is None:
+                    y_center = np.exp(np.median(np.log(y), axis=0))
+                y = y / y_center
             y_scaled = np.log(y)
-            if y_center is not None:
-                y_scaled -= np.log(y_center)
-            self.lognorm = True
         else:
-            y_scaled = y
-            if y_center is not None:
+            y_scaled = 1 * y
+            if center:
+                if y_center is None:
+                    y_center = np.median(y, axis=0)
                 y_scaled -= y_center
-            self.lognorm = False
 
         # whiten by MAD std
+        self.whitened = whiten
         if whiten:
             if y_scaled_std is None:
                 y_scaled_std = np.median(np.abs(y_scaled), axis=0, keepdims=True) * 1.4826
             y_scaled /= y_scaled_std
 
-        if save_scaling:
+        if save:
             self.y_center = y_center
             self.y_scaled = y_scaled
             self.y_scaled_std = y_scaled_std
@@ -254,7 +242,7 @@ class Emulator:
             Scaled y target values to unscale given saved scalings
 
         error : array_like, (Nsamples, Nfeatures)
-            Error variance on scaled y to unscale
+            Error standard deviation on scaled y to unscale
 
         Returns
         -------
@@ -262,22 +250,22 @@ class Emulator:
             unscaled y
 
         array_like
-            unscaled variance on y
+            unscaled standard dev on y
         """
         # unscale by std if whitened
-        if hasattr(self ,'y_scaled_std') and self.y_scaled_std is not None:
+        if self.whitened:
             y = y * self.y_scaled_std
             if error is not None:
-                error = error * self.y_scaled_std**2
+                error = error * self.y_scaled_std
 
         if self.lognorm:
             y = np.exp(y)
-            if self.y_center is not None:
-                y += np.exp(self.y_center)
+            if self.centered:
+                y *= self.y_center
             if error is not None:
-                error = y**2 * error
+                error = y * error
         else:
-            if self.y_center is not None:
+            if self.centered:
                 y = y + self.y_center
 
         if error is None:
@@ -363,8 +351,7 @@ class Emulator:
             KLT weights
 
         error : array_like, (Nsamples, Nmodes)
-            This is the diagonal of the covariance matrix of w.
-            Reproject onto the diagonal of the cov. mat. of y.
+            Standard deviation on w to reproject onto y basis
 
         Returns
         -------
@@ -372,7 +359,7 @@ class Emulator:
             w array reprojected by KLT
 
         array_like
-            reprojected w covariance, if error is not None
+            reprojected standard deviation on y, if error is not None
         """
         # de-project w
         y = (w * self.w_norm) @ self.eig_vecs
@@ -380,6 +367,11 @@ class Emulator:
         if error is None:
             return y
         else:
-            error = w * self.w_norm**2 @ (self.eig_vecs @ self.eig_vecs.T.conj())
-            return y, error
+            # transform error to 3D array w/ variance along diagonal
+            error_var = np.array([np.diag(s * self.w_norm)**2 for s in error])
+            # propagate variance throgh eigen modes
+            y_var = self.eig_vecs.T @ error_var @ self.eig_vecs
+            # take diagonal and get stand dev
+            y_std = np.sqrt(np.diagonal(y_var, axis1=-2, axis2=-1))
+            return y, y_std
 
