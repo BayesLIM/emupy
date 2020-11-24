@@ -3,5 +3,6 @@ pyephem
 aipy
 torch
 sympy
+numexpr
 pytest
 pytest-cov
