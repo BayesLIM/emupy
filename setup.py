@@ -11,8 +11,7 @@ setup(
     description     = 'emulators in python',
     author          = 'Nick Kern',
     url             = "http://github.com/nkern/emupy",
-    packages        = ['emupy','emupy.scripts'],
-    setup_requires  = ['pytest-runner'],
+    packages        = ['emupy','emupy.data'],
     tests_require   = ['pytest']
     )
 

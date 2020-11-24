@@ -1,5 +1,4 @@
 import numpy as np
-import unittest
 import warnings
 from scipy import stats, linalg
 from emupy import Emulator

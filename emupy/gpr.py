@@ -5,7 +5,6 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 import copy
 import numpy as np
 
-
 from .emulator import Emulator
 from . import utils
 
