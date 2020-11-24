@@ -1,5 +1,5 @@
 ## emupy : Emulators in Python
-[![Build Status](https://travis-ci.com/nkern/emupy.svg?branch=master)](https://travis-ci.org/nkern/emupy)
+[![Build Status](https://travis-ci.org/nkern/emupy.svg?branch=master)](https://travis-ci.org/nkern/emupy)
 [![Coverage Status](https://coveralls.io/repos/github/nkern/emupy/badge.svg?branch=master)](https://coveralls.io/github/nkern/emupy?branch=master)
 
 ### Version: 1.0.0
@@ -21,6 +21,7 @@ emupy is only compatible with Python >= 3.6.
 #### Optional Dependencies:
 - pytorch >= 1.7.0
 - sympy >= 1.3
+- numexpr >= 2.6.9
 
 ### Install:
 To install, clone the repo, cd into it and run the setup.py script

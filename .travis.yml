@@ -13,7 +13,7 @@ install:
     - conda info -a
 
     # Install dependencies
-    - conda create -q -n test-env python=$TRAVIS_PYTHON_VERSION scikit-learn numpy scipy matplotlib astropy
+    - conda create -q -n test-env python=$TRAVIS_PYTHON_VERSION scikit-learn numpy scipy matplotlib astropy coveralls
     - source activate test-env
     - export PYTHONPATH=$HOME/miniconda/envs/test-env/lib/python2.7/site-packages:$PYTHONPATH
     - pip install -e .

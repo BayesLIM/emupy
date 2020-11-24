@@ -2,6 +2,7 @@
 *.swp
 *pycache*
 .eggs*
-
-
+emupy.egg*
+examples/*checkpoints
+emupy/tests/*coverage
 
