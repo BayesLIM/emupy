@@ -3,3 +3,5 @@ pyephem
 aipy
 torch
 sympy
+pytest
+pytest-cov
