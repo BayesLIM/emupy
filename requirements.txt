@@ -1,3 +1,5 @@
 emcee >= 2.2.1
 pyephem
 aipy
+torch
+sympy

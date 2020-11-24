@@ -7,7 +7,7 @@ except:
 
 setup(
     name            = 'emupy',
-    version         = '0.1',
+    version         = '1.0.0',
     description     = 'emulators in python',
     author          = 'Nick Kern',
     url             = "http://github.com/nkern/emupy",
