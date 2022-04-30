@@ -10,7 +10,7 @@ setup(
     version         = '1.0.0',
     description     = 'emulators in python',
     author          = 'Nick Kern',
-    url             = "http://github.com/nkern/emupy",
+    url             = "https://github.com/BayesLIM/emupy",
     packages        = ['emupy','emupy.data'],
     tests_require   = ['pytest']
     )
