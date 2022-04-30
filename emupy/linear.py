@@ -20,7 +20,7 @@ from .emulator import Emulator
 from . import utils
 
 
-def get_poly_terms(Nfeatures, degree):
+def get_poly_terms(Nfeatures, degree, feature_degree=False):
     """
     Function for getting power of polynomial terms
     given Nfeatures with largest power of degree
@@ -30,8 +30,17 @@ def get_poly_terms(Nfeatures, degree):
     Nfeatures : int
         Number of dependent axes (or features), e.g. Nfeatures=2 for x, y
 
-    degree : int
-        Degree of largest polynomial product. e.g. degree=2 for 1, x^2, xy, y^2
+    degree : int or list
+        Degree of largest polynomial. If feature_degree == False (default),
+        this caps the largest polynomial term at degree.
+        e.g. degree=2 yields 1,x,x^2,y,y^2,xy (note no cross terms like x^2y or x^2y^2)
+        If feature_degree == True, this sets the maximum degree for each feature.
+        e.g. degree=2 for 1,x,x^2,y,y^2,xy,x^2y,xy^2,x^2y^2
+
+    feature_degree : bool, optional
+        Determines whether degree sets a cap on the largest polynomial degree,
+        or the largest feature degree. If True, can pass degree as a list of int
+        specifying the degree of each feature.
 
     Returns
     -------
@@ -39,8 +48,28 @@ def get_poly_terms(Nfeatures, degree):
         List of polynomial terms, with tuples indicating
         the power of each variable in the term
     """
-    perms = np.array(list(itertools.product(range(degree + 1), repeat=Nfeatures)))
-    return perms[perms.sum(axis=1) <= degree]
+    # setup degree for each feature, and get largest degree
+    if isinstance(degree, (list, tuple, np.ndarray)):
+        assert len(degree) == Nfeatures
+        assert feature_degree
+        max_degree = max(degree)
+    else:
+        max_degree = degree
+        degree = [max_degree for i in range(Nfeatures)]
+
+    # setup all feature permutations up to max_degree order
+    terms = np.array(list(itertools.product(range(max_degree + 1), repeat=Nfeatures)))
+
+    if not feature_degree:
+        # if not feature_degree, eliminate excess terms
+        terms = terms[terms.sum(axis=1) <= max_degree]
+    else:
+        # eliminate excess terms for each feature if feature_degree
+        for i in range(Nfeatures):
+            keep = terms[:, i] <= degree[i]
+            terms = terms[keep]
+    
+    return terms
 
 
 def get_poly_expr(poly_terms):

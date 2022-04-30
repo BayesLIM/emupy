@@ -3,7 +3,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/nkern/emupy/badge.svg?branch=master)](https://coveralls.io/github/nkern/emupy?branch=master)
 
 ### Version: 1.0.0
-Code Repo : https://github.com/nkern/emupy
+Code Repo : https://github.com/BayesLIM/emupy
 
 ### About:
 *emupy* is a generalized Python implementation of the emulator algorithm detailed in [Kern et al. 2017](https://arxiv.org/abs/1705.04688),
