@@ -158,7 +158,7 @@ def set_poly_basis(term_expr, basis):
     return new_expr
 
 
-def setup_polynomial(X, degree, basis='direct'):
+def setup_polynomial(X, degree, feature_degree=False, basis='direct'):
     """
     Setup polynomial A matrix
 
@@ -168,7 +168,11 @@ def setup_polynomial(X, degree, basis='direct'):
         Feature values for training data
 
     degree : int
-        Maximum polynomial degree
+        Maximum polynomial degree, see get_poly_terms() for details
+
+    feature_degree : bool
+        Whether degree caps feature or polynomial term degree,
+        see get_poly_terms() for details
 
     basis : str
         Polynomial basis to use.
@@ -186,7 +190,7 @@ def setup_polynomial(X, degree, basis='direct'):
     Nsamples, Nfeatures = X.shape
 
     # get polynomial terms
-    poly_terms = get_poly_terms(Nfeatures, degree)
+    poly_terms = get_poly_terms(Nfeatures, degree, feature_degree=feature_degree)
     Nterms = len(poly_terms)
     poly_expr = get_poly_expr(poly_terms)
 
