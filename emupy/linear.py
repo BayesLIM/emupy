@@ -201,7 +201,7 @@ def setup_polynomial(X, degree, feature_degree=False, basis='direct'):
     Xfeat_to_terms = {"x_{}".format(i): X[:, i] for i in range(Nfeatures)}
 
     # iterate over terms and evaluate
-    A = np.ones((Nsamples, Nterms), dtype=np.float)
+    A = np.ones((Nsamples, Nterms), dtype=float)
     for i in range(Nterms):
         A[:, i] = numexpr.evaluate(poly_expr[i], local_dict=Xfeat_to_terms)
 
