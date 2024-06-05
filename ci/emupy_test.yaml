@@ -1,0 +1,21 @@
+name: emupy
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - h5py
+  - "numpy>=1.18"
+  - pytest
+  - "scipy>=1.4.0"
+  - scikit-learn
+  - scikit-image
+  - numexpr
+  - sympy
+  - mpi4py
+  - pyyaml
+  - psutil
+  - pytest-cov
+  - coveralls
+  - "pytorch::pytorch>=1.7.0"
+  - "pytorch::torchvision>=0.8.1"
