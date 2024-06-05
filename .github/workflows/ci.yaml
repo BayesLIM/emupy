@@ -38,6 +38,7 @@ jobs:
     - name: Setup Environment
       run: |
         export PATH="$HOME/miniconda/bin:$PATH"
+        pwd
         ./ci/install_conda.sh
     - name: Install
       run: |
