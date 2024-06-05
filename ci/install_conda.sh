@@ -4,6 +4,7 @@ conda config --set always_yes yes --set changeps1 no
 conda update -q conda
 conda info -a
 conda create --name=${ENV_NAME}  python=$PYTHON --quiet
+pwd
 conda env update -n ${ENV_NAME} -f ci/${ENV_NAME}.yaml
 source activate ${ENV_NAME}
 
