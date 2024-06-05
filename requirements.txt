@@ -1,6 +1,6 @@
 emcee >= 2.2.1
+sklearn
 pyephem
-aipy
 torch
 sympy
 numexpr
