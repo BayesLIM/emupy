@@ -1,6 +1,7 @@
 ## emupy : Emulators in Python
-[![Build Status](https://travis-ci.org/nkern/emupy.svg?branch=master)](https://travis-ci.org/nkern/emupy)
-[![Coverage Status](https://coveralls.io/repos/github/nkern/emupy/badge.svg?branch=master)](https://coveralls.io/github/nkern/emupy?branch=master)
+![Run Tests](https://github.com/BayesLIM/emupy/workflows/Run%20Tests/badge.svg)
+[![codecov](https://codecov.io/gh/BayesLIM/emupy/branch/main/graph/badge.svg?token=3Q1IZUGZ5W)](https://codecov.io/gh/BayesLIM/emupy)
+
 
 ### Version: 1.0.0
 Code Repo : https://github.com/BayesLIM/emupy
