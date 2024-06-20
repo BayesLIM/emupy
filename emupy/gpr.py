@@ -90,23 +90,24 @@ class GPEmulator(Emulator):
         # parse if error is also computed
         if kwargs.get("return_std", False) or kwargs.get("return_cov", False):
             # split prediction from error
-            pred, err = np.array([p[0] for p in pred]), np.array([p[1] for p in pred])
-            # one error quoted for all modes, so make copies per mode and stack along zeroth axis
-            err = np.array([np.repeat(e[None], p.shape[1], axis=0) for e, p in zip(err, pred)])
-            err = np.vstack(err)
+            pred, err = [np.atleast_2d(p[0].T).T for p in pred], [np.atleast_2d(p[1].T).T for p in pred]
+            err = np.concatenate(err, axis=-1)
             if kwargs.get("return_std", False):
-                # make err a variance term for re-scaling and re-projection
+                # temporarily make err a variance for re-scaling and re-projection
                 err = err**2
 
-        # stack predictions along first axis
-        pred = np.hstack(pred)
+        else:
+            pred = [np.atleast_2d(p.T).T for p in pred]
+
+        # stack predictions along last axis
+        pred = np.concatenate(pred, axis=-1)
 
         # reorganize according to modegroups
         sort = np.argsort(utils.flatten(self.modegroups))
         pred = pred[:, sort]
         if err is not None:
             # sort error and transpose to match pred ordering
-            err = err[sort].T
+            err = err[:, sort]
 
         # unscale data if scaled
         if unscale:

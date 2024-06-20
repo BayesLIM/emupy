@@ -32,10 +32,20 @@ def test_gpr():
 
     E.scale_data(y, center=True, lognorm=True, save=True)
     E.train(X, E.y_scaled, GP)
-    pred, err = E.predict(X, return_std=True, unscale=True)
+    pred1 = E.predict(X, return_std=False, unscale=True)
+    pred2, err = E.predict(X, return_std=True, unscale=True)
+
+    assert np.isclose(abs(pred1 - pred2), 0, atol=1e-5).all()
 
     # assert prediction is a good match (to below 10%)
-    assert np.isclose(abs(pred - y)/pred, 0, atol=0.1).all()
+    assert np.isclose(abs(pred1 - y)/pred1, 0, atol=0.1).all()
 
     # assert error is reasonable
-    assert np.isclose(np.mean(np.std(pred - y) / err), 1, rtol=2)
+    assert np.isclose(np.mean(np.std(pred1 - y) / err), 1, rtol=2)
+
+
+    # test for grouped modegroups
+    _y = np.concatenate([y, y], axis=1)
+    E.scale_data(_y, center=True, lognorm=True, save=True)
+    E.train(X, E.y_scaled, GP, modegroups=[[0,1]])
+    pred, err = E.predict(X, return_std=True, unscale=True)

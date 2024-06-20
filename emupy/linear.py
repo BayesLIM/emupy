@@ -289,7 +289,7 @@ class LinearEmulator(Emulator):
             Feature values for prediction
         """
         # get A matrix
-        A, _ = setup_polynomial(X, self.degree, self.basis)
+        A, _ = setup_polynomial(X, self.degree, basis=self.basis)
 
         # get prediction
         pred = np.hstack([model.predict(A, **kwargs) for model in self.models])
